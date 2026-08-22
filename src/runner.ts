@@ -2,16 +2,29 @@
 import { spawn as nodeSpawn } from 'node:child_process';
 import type { ScanTarget, Unscanned, UnscannedReason } from './types.js';
 
-// ⚠️ 실제 mcp-scanner CLI 플래그는 미실측(§0 전제사항) — Session 1 `mcp-scanner --help` 실측 후
-// 이 함수만 교체한다. 그 외 어떤 모듈도 이 함수의 인자 형식에 의존하지 않는다.
+// Task 8b 실측(2026-08-22, `pip install cisco-ai-mcp-scanner`로 격리 venv 설치 후
+// `mcp-scanner --help`/`config --help`/`remote --help` 직접 실행 — 버전 4.8.3):
+// ①글로벌 플래그(--format/--analyzers 등)는 서브커맨드보다 **먼저** 와야 한다(argparse
+//   subparsers 제약 — 뒤에 두면 "unrecognized arguments"로 즉시 실패, exit 2).
+// ②로컬 설정 1개 파일 스캔은 `--config` 가 아니라 `config --config-path <path>` 서브커맨드다.
+// ③원격 스캔은 `--remote <url>` 이 아니라 `remote --server-url <url>` 서브커맨드다.
+// ④기본 --analyzers 값(api,yara,llm)은 MCP_SCANNER_API_KEY/MCP_SCANNER_LLM_API_KEY 미설정 시
+//   대상 파일 존재 여부와 무관하게 항상 exit 1로 실패한다(실측 확인, stderr:
+//   "API analyzer requested but MCP_SCANNER_API_KEY not configured"). ADR-001/002(로컬 전용,
+//   외부 키 불요)를 지키려면 API/LLM/VirusTotal 키가 필요 없는 analyzer만 명시로 고정해야 한다
+//   — yara(패턴탐지)·readiness(운영신뢰성 휴리스틱)·vulnerable_package(pip-audit 기반)는
+//   키 없이 로컬 실행이 확인됐다(실측: 3종 조합으로 exit 0, 유효 JSON 수신).
+const LOCAL_SAFE_ANALYZERS = ['yara', 'readiness', 'vulnerable_package'];
+
 export function buildScannerArgs(target: ScanTarget, opts: { allowRemote: boolean }): string[] | null {
   if (target.transport === 'remote' && !opts.allowRemote) {
     return null; // argv 에 절대 넣지 않는다 — ADR-006
   }
+  const globalArgs = ['--format', 'raw', '--analyzers', LOCAL_SAFE_ANALYZERS.join(',')];
   if (target.transport === 'remote') {
-    return ['--format', 'raw', '--remote', target.remoteUrl!];
+    return [...globalArgs, 'remote', '--server-url', target.remoteUrl!];
   }
-  return ['--format', 'raw', '--config', target.sourcePath];
+  return [...globalArgs, 'config', '--config-path', target.sourcePath];
 }
 
 // src/runner.ts (2/2 — scanOne 추가)
@@ -49,10 +62,21 @@ export type ScanOneOpts = {
 
 // B-1 codex 반영: 종전엔 파싱 실패 시 원인 분류가 scanOne 안에 인라인으로 뭉개져 있었다.
 // ADR-007이 요구하는 "Session 1 실측 exit code 표"가 들어갈 자리를 명시적인 별도 함수로
-// 분리한다 — Task 8b가 EXIT_CODE_MEANING을 채운다.
-// ⚠️ Task 8b 실측 확정 필요: 아래 표는 비어 있다(실제 mcp-scanner exit code 관행 미실측).
+// 분리한다.
+// Task 8b 실측(2026-08-22, cisco-ai-mcp-scanner 4.8.3, 격리 venv):
+//   exit 0 — 정상 종료. stdout이 유효 JSON(봉투)이며 이 경우 위 close 핸들러가 이 함수 자체를
+//     호출하지 않는다(ADR-007 1차 판정 성공 경로). 서버 연결 실패(예: MCP 핸드셰이크 불가)도
+//     여기 해당 — 실패는 stderr 로그로만 남고 exit 0 + `scan_results: []`로 조용히 계속된다.
+//   exit 1 — 스캐너 자체의 치명적 오류(설정 파일 파싱 실패 `FileNotFoundError`,
+//     또는 요청한 analyzer에 필요한 API/LLM 키 미설정). stdout은 항상 비어 있다(0바이트) —
+//     JSON.parse가 반드시 실패하므로 이 함수가 정확히 호출되는 경로다(실측 재현: 존재하지 않는
+//     --config-path 지정 → exit 1, stdout 0바이트, stderr에 Python traceback).
+//   exit 2 — argparse 인자 파싱 오류(예: 존재하지 않는 플래그, 서브커맨드 뒤에 온 글로벌 플래그).
+//     실측 재현: `mcp-scanner --version`(존재하지 않는 플래그) → exit 2, "unrecognized arguments".
 const EXIT_CODE_MEANING: Record<number, string> = {
-  // 127: 'shell: command not found',  // 예시 — Task 8b가 실제 값으로 채운다
+  0: 'scanner completed (should not reach here — stdout parsed as JSON already)',
+  1: 'scanner fatal error — invalid --config-path, or a requested analyzer is missing its required API/LLM key',
+  2: 'argument parsing error — invalid/unrecognized CLI flag or flag ordering (global flags must precede the subcommand)',
 };
 
 export function classifyScannerFailure(exitCode: number | null, stderr: string, stdout: string): { reason: UnscannedReason; detail: string } {

@@ -6,24 +6,47 @@ export type ScannerRawEnvelope = {
   requested_analyzers?: string[];
 };
 
-// ⚠️ Session 1 Task 8b 실측 확정 필요: 조사 문서는 최상위 3개 키(server_url/scan_results/
-// requested_analyzers)만 확인했고 `scan_results[]` 원소 내부 필드명은 실측하지 못했다. 아래는
-// Cisco 소스(`mcpscanner/core/analyzers/`가 YARA 룰명·taxonomy·severity를 finding 단위로
-// 반환한다는 설계 원칙, §1 6종 엔진 표)에 근거한 "최선 추정"이며 Task 8b에서 실제 필드명으로 교체한다.
+// Task 8b 실측(2026-08-22, cisco-ai-mcp-scanner 4.8.3 — 격리 venv에 `pip install`, 로컬
+// stdio MCP 서버(`@modelcontextprotocol/server-everything`)를 대상으로
+// `mcp-scanner --format raw --analyzers yara,readiness,vulnerable_package config
+// --config-path <실제 .mcp.json>` 실행해 raw 출력 직접 확인, `fixtures/mcp-scanner-0.1.0/
+// raw-envelope.json`이 그 실측 출력의 발췌본이다):
+//
+// Spec §5.1b가 "최선 추정"으로 적었던 스키마(`scan_results[].findings[]` = 개별 finding 객체의
+// **배열**, 각 원소가 `rule`/`rule_id` 필드를 가짐)는 **구조 자체가 실제와 다르다** — 실측 결과는:
+//   - `scan_results[]`는 "분석기 1회 실행당 1개 원소"가 아니라 **"스캔 대상 항목(도구/프롬프트/
+//     리소스) 1개당 1개 원소"**다.
+//   - 각 원소의 `findings`는 배열이 아니라 **분석기 이름을 키로 하는 객체**다
+//     (`{ yara_analyzer: {...}, readiness_analyzer: {...}, ... }`).
+//   - 각 분석기 결과는 개별 finding 목록이 아니라 **롤업 요약**이다: `severity`(단일값,
+//     "SAFE"/"HIGH" 등 대문자) · `threat_names`(문자열 배열, 실측에서는 "unknown" 1개뿐이었다)
+//     · `threat_summary`(자유 텍스트) · `total_findings`(개수) · (readiness만) `mcp_taxonomies`.
+//   - `rule`/`rule_id` 필드 자체가 **존재하지 않는다**. 개별 finding을 식별할 안정적인 rule
+//     식별자가 이 스캐너 버전의 raw 출력에는 없다.
+//
+// 이 사실은 §5.4 ontology.yaml(Session 2, 아직 미작성)의 `rule_map` 설계(`HEUR-001`,
+// `credential_harvesting`, `CVE-*`, `prompt_injection` 등 rule 이름 매칭)가 실제 finding에는
+// **매칭 대상 필드가 없어 항상 미매칭(axis: null)**이 될 수 있다는 뜻이다 — Session 2 착수 전
+// 재검토 필요(IMPL-NOTES.md에 기록, §12 미결 승계).
 export type RawScanResultEntry = {
-  target?: string;
-  analyzer?: string;
-  findings?: RawScannerFindingEntry[];
+  status?: string;
+  is_safe?: boolean;
+  findings?: Record<string, RawAnalyzerSummary>; // 분석기명 → 롤업 요약(배열이 아니다)
+  tool_name?: string;
+  resource_name?: string;
+  prompt_name?: string;
+  item_type?: string;
+  server_source?: string;
+  server_name?: string;
   [key: string]: unknown;
 };
 
-export type RawScannerFindingEntry = {
-  rule?: string;
-  rule_id?: string;      // 실제 필드명이 rule/rule_id 둘 중 무엇인지 미확정 — 둘 다 시도
-  taxonomy?: string;     // AITech-N.N
-  severity?: string;
-  target?: string;
-  line?: number;
+export type RawAnalyzerSummary = {
+  severity?: string;           // "SAFE" | "HIGH" | ... (대문자, §0 전제사항 소문자 Severity와 별개)
+  threat_names?: string[];
+  threat_summary?: string;
+  total_findings?: number;
+  mcp_taxonomies?: string[];   // readiness_analyzer에서만 관측(현재까지는 항상 빈 배열)
   [key: string]: unknown;
 };
 
@@ -32,17 +55,23 @@ export function parseScannerRawEnvelope(raw: unknown, fallbackTarget: string): R
   const scanResults = Array.isArray(envelope?.scan_results) ? envelope.scan_results : [];
   const out: RawFinding[] = [];
   for (const entry of scanResults) {
-    const findings = Array.isArray(entry.findings) ? entry.findings : [];
-    for (const f of findings) {
-      const rule = f.rule ?? f.rule_id;
-      if (!rule) continue; // 룰 식별자가 없는 항목은 스킵 — 조용히 죽지 않고 건너뛴다(fail-open, §0)
+    const findingsByAnalyzer = entry.findings && typeof entry.findings === 'object' ? entry.findings : {};
+    const target = (entry.tool_name ?? entry.resource_name ?? entry.prompt_name ?? entry.server_name ?? fallbackTarget) as string;
+    for (const [analyzerKey, summary] of Object.entries(findingsByAnalyzer)) {
+      const totalFindings = typeof summary?.total_findings === 'number' ? summary.total_findings : 0;
+      if (totalFindings <= 0) continue; // "SAFE"(0건)는 finding이 아니다 — 조용히 건너뛴다
+      const threatNames = Array.isArray(summary.threat_names) ? summary.threat_names : [];
+      // rule 필드가 원본에 없으므로(위 주석 참조) analyzer명+threat_names로 최선 근사 식별자를 만든다.
+      const rule = threatNames.length > 0 ? `${analyzerKey}:${threatNames.join('+')}` : analyzerKey;
+      const taxonomy = Array.isArray(summary.mcp_taxonomies) && summary.mcp_taxonomies.length > 0
+        ? summary.mcp_taxonomies[0]
+        : undefined;
       out.push({
-        rule: String(rule),
-        target: (f.target ?? entry.target ?? fallbackTarget) as string,
-        line: typeof f.line === 'number' ? f.line : undefined,
-        taxonomy: typeof f.taxonomy === 'string' ? f.taxonomy : undefined,
-        severity: typeof f.severity === 'string' ? f.severity : undefined,
-        raw: f as Record<string, unknown>,
+        rule,
+        target,
+        taxonomy,
+        severity: typeof summary.severity === 'string' ? summary.severity : undefined,
+        raw: { ...summary, analyzer: analyzerKey, tool_name: entry.tool_name, item_type: entry.item_type, server_name: entry.server_name },
       });
     }
   }

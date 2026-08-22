@@ -1,21 +1,66 @@
 {
-  "server_url": "stdio://local",
-  "requested_analyzers": ["yara", "readiness", "prompt_defense"],
+  "server_url": "/tmp/agenttrust-scan-test/real.mcp.json",
+  "requested_analyzers": ["yara", "readiness", "vulnerable_package"],
   "scan_results": [
     {
-      "target": "srv-a",
-      "analyzer": "yara",
-      "findings": [
-        { "rule": "credential_harvesting", "taxonomy": "AITech-3.2", "severity": "high", "line": 12 },
-        { "rule": "prompt_injection", "taxonomy": "AITech-1.1", "severity": "medium" }
-      ]
+      "status": "completed",
+      "is_safe": false,
+      "findings": {
+        "yara_analyzer": {
+          "severity": "SAFE",
+          "threat_names": [],
+          "threat_summary": "No threats detected",
+          "total_findings": 0
+        },
+        "readiness_analyzer": {
+          "severity": "HIGH",
+          "threat_names": ["unknown"],
+          "threat_summary": "Tool 'echo' does not specify a timeout. Operations may hang indefinitely if external services become unresponsive.",
+          "total_findings": 7,
+          "mcp_taxonomies": []
+        },
+        "vulnerable_package_analyzer": {
+          "severity": "SAFE",
+          "threat_names": [],
+          "threat_summary": "No threats detected",
+          "total_findings": 0
+        }
+      },
+      "tool_name": "echo",
+      "tool_description": "Echoes back the input string",
+      "item_type": "tool",
+      "server_source": "/tmp/agenttrust-scan-test/real.mcp.json",
+      "server_name": "everything"
     },
     {
-      "target": "srv-a",
-      "analyzer": "readiness",
-      "findings": [
-        { "rule": "HEUR-001", "severity": "low" }
-      ]
+      "status": "completed",
+      "is_safe": false,
+      "findings": {
+        "yara_analyzer": {
+          "severity": "SAFE",
+          "threat_names": [],
+          "threat_summary": "No threats detected",
+          "total_findings": 0
+        },
+        "readiness_analyzer": {
+          "severity": "HIGH",
+          "threat_names": ["unknown"],
+          "threat_summary": "Tool 'get-annotated-message' does not specify a timeout. Operations may hang indefinitely if external services become unresponsive.",
+          "total_findings": 7,
+          "mcp_taxonomies": []
+        },
+        "vulnerable_package_analyzer": {
+          "severity": "SAFE",
+          "threat_names": [],
+          "threat_summary": "No threats detected",
+          "total_findings": 0
+        }
+      },
+      "tool_name": "get-annotated-message",
+      "tool_description": "Demonstrates how annotations can be used to provide metadata about content.",
+      "item_type": "tool",
+      "server_source": "/tmp/agenttrust-scan-test/real.mcp.json",
+      "server_name": "everything"
     }
   ]
 }

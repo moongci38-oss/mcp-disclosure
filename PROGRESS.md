@@ -11,3 +11,8 @@
 - [x] Task 6: buildScannerArgs — commit 78345c5 (test 3/3 pass)
 - [x] Task 7: scanOne + classifyScannerFailure — commit 48d9a1d (test 2/2 pass, 전체 12/12 pass)
 - [x] Task 8: runScanner — commit ac53406 (전체 13/13 pass, RED 테스트는 spawn 모킹 함정을 피해 ScanDeps 주입 fake로 작성)
+- [x] Task 8a: parseScannerRawEnvelope + raw-envelope.json fixture — commit 9515bc2 (전체 16/16 pass)
+- [x] Task 8b: 실측 게이트 — mcp-scanner 4.8.3을 격리 venv(uv+python3.12)에 실제 설치·실행해
+  CLI 플래그/exit code/raw 스키마를 실측(브리프의 "미설치 가능성" 예상과 달리 설치 성공).
+  buildScannerArgs/classifyScannerFailure/parseScannerRawEnvelope를 실측 결과로 재작성.
+  상세: docs/scanner-exit-codes.md, IMPL-NOTES.md. 전체 22/22 pass.
