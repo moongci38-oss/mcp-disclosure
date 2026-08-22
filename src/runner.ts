@@ -142,3 +142,24 @@ export async function scanOne(
     });
   });
 }
+
+// src/runner.ts (3/3 — runScanner 추가)
+export type RunnerResult = {
+  rawByTarget: Map<string, unknown>;
+  unscanned: Unscanned[];
+  usedRemoteTargets: ScanTarget[];
+};
+
+export async function runScanner(targets: ScanTarget[], opts: ScanOneOpts, deps: ScanDeps = DEFAULT_DEPS): Promise<RunnerResult> {
+  const rawByTarget = new Map<string, unknown>();
+  const unscanned: Unscanned[] = [];
+  const usedRemoteTargets: ScanTarget[] = [];
+
+  for (const target of targets) {
+    const { raw, unscanned: u } = await scanOne(target, opts, deps);
+    if (u) { unscanned.push(u); continue; }
+    rawByTarget.set(target.sourcePath + '#' + target.name, raw);
+    if (target.transport === 'remote') usedRemoteTargets.push(target);
+  }
+  return { rawByTarget, unscanned, usedRemoteTargets };
+}
