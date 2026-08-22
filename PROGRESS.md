@@ -193,6 +193,32 @@ mcp_taxonomies 개수를 다르게 내는 조합은 우리가 상상해서 만�
 
 - **현재**: `npm test` **164/164 GREEN** (스캐너 유/무 양쪽 확인)
 
+### 배포 산출물 검증 (2026-08-22 — 하네스 갭 수리 후속)
+
+**⚠️ 배포 차단 버그를 잡았다.** `dist/` 가 `.gitignore` 에 있어서 **npm 이 패키지에서 통째로 뺐다.**
+`bin/agenttrust.js` 는 `../dist/src/cli.js` 를 import 하므로, 그대로 배포했다면
+**모든 사용자에게서 첫 줄에 죽었다**:
+
+```
+$ npm pack && tar xzf *.tgz && node package/bin/agenttrust.js scan
+Unexpected error: Cannot find module '.../package/dist/src/cli.js'
+```
+
+로컬 테스트 164건은 **전부 GREEN 이었다** — dist 가 내 머신에는 있었기 때문이다.
+이 프로젝트가 계속 만나는 **"등록 ≠ 발효"의 배포판**이다. 로컬 GREEN 은 배포 GREEN 이 아니다.
+
+- **조치**: `files` allowlist(`dist/src/`·`bin/`·`ontology.yaml`·`README.md`·`LICENSE`) +
+  `prepublishOnly: build && test` + **`LICENSE` 파일 신설**(package.json 은 MIT 라고 선언해 놓고
+  파일이 없었다).
+- **실증**: 팩 → `npm install <tarball>` → `./node_modules/.bin/agenttrust scan` **정상 동작**
+  (소견서 2종 생성 확인). 이게 `npx` 사용자가 겪는 실제 경로다.
+- **회귀 고정**: `test/package-contents.test.ts` 4건 — 필수 파일 포함 · **bin 의 import 경로가
+  패키지 안에 실재하는지**(경로가 바뀌어도 따라간다) · 테스트/소스/문서 미배포 · `files`+
+  `prepublishOnly` 존재. 판별력 실증: `files` 제거 → **4건 FAIL**, 원복 후 168/168.
+- **패키지 크기**: 121파일 350KB → **16파일 26.5KB**(문서·fixture·컴파일된 테스트 제외).
+
+- 현재: `npm test` **168/168 GREEN**
+
 ### 남은 미검증 / 미결
 
 - **원격 대상 라이브 스캔** — 실제 원격 MCP 엔드포인트가 필요해 미실행(스파이 E2E 로만 검증)
