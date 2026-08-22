@@ -70,12 +70,14 @@
      **통과했지만 검증하려던 경로를 타지 않았다.** 소유자 없는 `AISubtech-4.1.1` 로 교체.
      교훈: 충돌 fixture 에는 **아무도 소유하지 않은 값**을 써야 한다. Spec §8.5 Task 13·17 에도
      같은 정정을 반영했다.
-  2. **`wiring-check.sh` 가 흔한 영어 단어 심볼에서 과다 계상한다.** `normalize` → 190곳으로
-     보고하지만 실제 프로덕션 소비처는 1곳이다(node_modules·dist·문서 산문까지 긁는 것으로 보임).
-     반대로 `assignAxis` 는 0곳으로 나왔는데 실제로는 1곳에서 호출된다(과소 계상). 완료 보고에
-     이 숫자를 필수로 적게 돼 있어 그대로 믿으면 틀린 숫자가 커밋 메시지에 박힌다 — 프로젝트
-     `src/`·`bin/` 한정 grep 으로 교차 확인할 것.
-     하네스 갭 기록: `harness-gaps/2026-08-22-wiring-check-common-word-false-positive.md`
+  2. **`wiring-check.sh` 가 이 레포를 아예 쳐다보지 않고 있었다.** `normalize` → 190곳으로
+     보고했는데 실제 소비처는 1곳이었다. 처음엔 "node_modules 까지 긁는다"고 적었으나 **오진**이다 —
+     그 도구의 검색 루트는 `$FORGE_ROOT/{.claude,shared,dev}` **고정**이라 agenttrust 는 검사
+     대상이 아니었다(190곳은 전부 forge 안의 hit). 숫자만 있고 **범위가 출력되지 않아** 오진했다.
+     → **2026-08-22 수리 완료**(forge `c8b02801`): 검색 범위 자동 판정 + 범위·목록 항상 출력 +
+       제품 레포에서 .md 를 [호출] 로 세지 않음 + `.ts` 검색 추가. 재측정 `normalize` **5곳**.
+     교훈: **범위 없는 숫자는 검증할 수 없고, 검증 못 하는 숫자는 근거가 아니다.**
+     갭 기록(정정본 포함): `harness-gaps/2026-08-22-wiring-check-common-word-false-positive.md`
   3. **`--analyzers` 에 `prompt_defense` 를 넣으면 출력 분석기 키가 둘로 갈린다** —
      `prompt_defense_analyzer`(항상 0건 유령) / `promptdefense_analyzer`(실제 finding).
      스캐너 쪽 이름 불일치(`report_generator.py:51` vs `:65`)이며, 파서의 `total_findings<=0`

@@ -68,9 +68,11 @@
 
 셋의 소비처는 `src/cli.ts` (**Task 25, Session 4**) 다 — 아직 파이프라인 전체를 잇는 코드가 없다.
 재현: `grep -rn '\bnormalize\b' src/ bin/ | grep -v 'export function'`
-⚠️ `wiring-check.sh normalize` 는 **190곳**을 보고하는데 이는 오탐이다(흔한 영어 단어라
-node_modules·문서까지 긁는다). 하네스 갭으로 기록:
-`forge-outputs/11-platform/pipelines/harness-gaps/2026-08-22-wiring-check-common-word-false-positive.md`
+⚠️ `wiring-check.sh normalize` 가 **190곳**을 보고했는데 오탐이었다.
+**원인은 처음 적은 것과 다르다** — node_modules 를 긁은 게 아니라 그 도구가 **agenttrust 를
+아예 쳐다보지 않았다**(검색 루트가 `~/forge` 고정이었다). 190곳은 전부 forge 안의 hit 이다.
+→ **2026-08-22 도구 수리 완료**(forge `c8b02801`): 검색 범위 자동 판정 + 범위 항상 출력.
+재측정하니 `normalize` **5곳**(전부 실제 `src/*.ts`)이다.
 
 ## P5 Session 3 진행상황 — 클레임 매핑 + 커버리지 3칸 렌더 (5 SP)
 
@@ -110,8 +112,9 @@ $ ls bin/   → 디렉터리 없음 (package.json 의 bin.agenttrust 가 가리�
 다. 즉 조각은 다 만들어졌고 각각 테스트로 검증됐지만, **`npx agenttrust scan` 은 아직 실행되지
 않는다.** 이것을 "완료"라고 부르지 않는다.
 
-⚠️ `wiring-check.sh` 는 `normalize` 를 190곳으로 보고한다(오탐) — 위 import 그래프가 정본이다.
-하네스 갭 기록: `harness-gaps/2026-08-22-wiring-check-common-word-false-positive.md`
+⚠️ `wiring-check.sh` 가 `normalize` 를 190곳으로 보고했으나 **오탐**이었다(그 도구가
+agenttrust 가 아니라 `~/forge` 를 뒤지고 있었다). **2026-08-22 수리 완료** — 이제 검색 범위를
+자동 판정하고 항상 출력한다. 이 시점의 정본은 위 import 그래프다.
 
 ## P5 Session 4 진행상황 — 판별력 테스트 + 배선 + 도그푸딩 (4 SP)
 
