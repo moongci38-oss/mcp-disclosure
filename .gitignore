@@ -4,3 +4,5 @@ node_modules/
 dist/
 .claude/handover/
 .claude/session-plans/
+.claude/agent-budget/
+.claude/logs/

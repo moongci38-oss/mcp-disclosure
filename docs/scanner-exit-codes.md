@@ -71,17 +71,42 @@ Task 8a가 조사 문서 기반 "최선 추정"으로 만든 `parseScannerRawEnv
 
 ## 미실측으로 남는 항목 (다음 세션 재확인 필요)
 
-- **Prompt Defense 12종 카테고리의 실제 `rule`/`threat_names` 표기**: 이번 실측 대상
-  (`server-everything`)은 프롬프트 인젝션성 콘텐츠를 포함하지 않아 `prompt_defense`류 분석기
-  자체를 트리거하지 못했다(애초에 `--analyzers`에 `api`/`llm`을 포함해야 할 수도 있음 — 그건
-  키가 필요해 이번 세션 범위 밖). 여전히 미확인.
-- **`data_flow`/`sdlc`/`accepts_taxonomy`(AITech-N.N)**: `mcp_taxonomies` 필드가 실측에서 항상
-  빈 배열이었다 — 이 스캐너가 그 축을 채우는 실제 사례를 아직 못 봤다.
-- **YARA 분석기가 실제로 위협을 탐지했을 때의 `threat_names`/`rule` 표기**: 이번 실측은 전부
-  `yara_analyzer: SAFE`였다(테스트 대상 서버가 실제 악성 패턴을 갖지 않음) — 악성 패턴 탐지 시
-  `threat_names`에 어떤 문자열이 들어가는지는 여전히 미확인.
-- **⚠️ ontology.yaml 설계 재검토 필요(Session 2 착수 전)**: `rule_map`이 `HEUR-001`·
-  `credential_harvesting`·`CVE-*`·`prompt_injection` 같은 "개별 finding rule 식별자"를
-  전제하는데, 실측된 raw 출력에는 그런 rule 필드 자체가 없다(`(analyzer, threat_name)` 롤업만
-  있음). Session 2의 `ontology.ts`/`normalize.ts` 설계는 이 사실을 반영해 `rule_map`의 키 공간을
-  다시 정의해야 할 가능성이 높다 — IMPL-NOTES.md 참조.
+> ⚠️ **2026-08-22 Session 2 착수 전 재측정으로 아래 항목 다수가 해소됐다.**
+> 전문·재현 명령·원본 출력 → `docs/planning/SPEC-v0-cli-AMENDMENT-01-signal-map.md` §2 ·
+> `docs/measurements/2026-08-22-signal-space/`
+
+### 해소됨 (재측정 완료)
+
+- ✅ **Prompt Defense 12종 카테고리 표기**: `--analyzers`에 **`prompt_defense`를 넣으면 키 없이
+  exit 0으로 동작**한다(api/llm 불요). `threat_names`에 12종이 **정확 문자열**로 실린다
+  (`INSTRUCTION_OVERRIDE` `DATA_LEAKAGE` `ROLE_ESCAPE` `INDIRECT_INJECTION`
+  `OUTPUT_WEAPONIZATION` `OUTPUT_MANIPULATION` `MULTILANG_BYPASS` `UNICODE_ATTACK`
+  `CONTEXT_OVERFLOW` `SOCIAL_ENGINEERING` `INPUT_VALIDATION` `ABUSE_PREVENTION`).
+  ⚠️ 분석기 키가 **두 개** 나온다 — `prompt_defense_analyzer`(항상 0건, 유령) /
+  `promptdefense_analyzer`(실제 finding). 후자를 써야 한다.
+- ✅ **YARA 발화 시 `threat_names` 표기**: 악성 패턴을 심은 정적 입력으로 발화시켜 실측했다.
+  값 공간은 **7종** — `PROMPT INJECTION` `CREDENTIAL HARVESTING` `CODE EXECUTION`
+  `INJECTION ATTACK` `SYSTEM MANIPULATION` `DATA EXFILTRATION` `TOOL POISONING`.
+  YARA 룰 파일은 10개이나 threat_type으로 7종에 합쳐진다(룰 단위 구분 불가).
+- ✅ **`mcp_taxonomies`는 "항상 빈 배열"이 아니다 — 구 서술을 폐기한다.** 그 관측은
+  `readiness_analyzer`만 봤기 때문이었다. **YARA가 발화하면**, 그리고 `promptdefense_analyzer`는
+  상시, `aitech`/`aisubtech`가 설명문까지 붙어 나온다(예: `AITech-1.1`/`AISubtech-1.1.1`).
+  `readiness_analyzer`만 필드는 있고 항상 `[]`다.
+
+### 여전히 미실측
+
+- **`vulnerable_package` 발화 시 출력**: 실제 취약 의존성을 가진 대상이 없어 미발화. 소스상
+  `threat_type`은 상수 `"VULNERABLE_DEPENDENCY"` 단일값이며 CVE ID는 `threat_summary` 첫 문장에만
+  남는다(`vulnerable_package_analyzer.py:365`) — 키로 쓸 수 없다.
+- **`data_flow`/`sdlc`(AITech-N.N)**: 이 스캐너가 그 축을 채우는 사례를 아직 못 봤다.
+
+### 치명적 구조 발견 — rule 식별자는 존재하나 CLI가 버린다
+
+`report_generator.py:32` `results_to_json()`이 finding당 `details["threat_type"]` **하나만**
+직렬화한다(`:82`). 실제로 존재하는 `details["rule_id"]`(`HEUR-001`~`HEUR-020`)와
+`details["raw_response"]["rule"]`(YARA 룰명)은 **출력에 복사되지 않는다.** 요약도
+`summaries[0]` 첫 문장만 남는다(`:128`) — `total_findings: 7`이어도 문장은 1개다.
+
+`raw`/`summary`/`detailed`/`by_tool`/`by_analyzer`/`by_severity`/`table` **7개 포맷 전부**가 이
+함수 출력에서 파생되므로(`_format_raw()` = `json.dumps(self.scan_data)`, `:344`) **포맷을 바꿔도
+못 건진다.** 이것이 개정안 #01의 근거다.

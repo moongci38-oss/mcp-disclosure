@@ -50,3 +50,15 @@
   `npm run build` 실행)이며, `npm test`(또는 `npm run build && node --test dist/test/**/*.test.js`)
   로는 22/22 전부 GREEN이다. 완료 보고의 "3개 명령 실측"에는 브리프가 요청한 bare `node --test`
   원문 출력(실패 포함)과 `npm test` 출력(GREEN)을 함께 남긴다 — 실패를 숨기지 않되 원인을 밝힌다.
+
+- **Session 2 착수 전 재측정 (2026-08-22) — 위 5번 항목의 후속·정정.** "안정적인 rule 식별자가
+  없다"는 진단은 **절반만 맞았다.** 식별자(`details["rule_id"]` = `HEUR-001`~`HEUR-020`,
+  `details["raw_response"]["rule"]` = YARA 룰명)는 스캐너 내부에 **실존**하는데,
+  `report_generator.py:32 results_to_json()`이 `details["threat_type"]` 하나만 직렬화하면서
+  버린다(`:82`). 7개 출력 포맷 전부가 이 함수에서 파생되므로 포맷 교체로는 못 건진다.
+  추가로 **`mcp_taxonomies`가 "항상 빈 배열"이라는 위 6번 서술은 폐기한다** — readiness만 봤기
+  때문이었고, YARA 발화 시·`promptdefense_analyzer`는 `aitech`/`aisubtech`를 정상 반환한다.
+  그리고 **`prompt_defense` 분석기는 API 키 없이 exit 0으로 동작**하며 12종 카테고리를 정확
+  문자열로 낸다 — Session 1의 `--analyzers` 조합에서 빠져 있었다.
+  → 개정안: `docs/planning/SPEC-v0-cli-AMENDMENT-01-signal-map.md` (**[STOP] 승인 대기 — 승인 전
+  Task 9 착수 금지**). 재현 명령·원본 출력: 그 문서 §2 · `docs/measurements/2026-08-22-signal-space/`
