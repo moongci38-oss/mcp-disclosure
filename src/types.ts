@@ -65,3 +65,6 @@ export type ScanTarget = {
   transport: Transport;
   remoteUrl?: string;      // transport==='remote'일 때만 — argv에는 조건부로만 전달(§8.3 ADR-006)
 };
+
+export type UnscannedReason = 'remote_out_of_scope' | 'timeout' | 'output_too_large' | 'scanner_error';
+export type Unscanned = { target: ScanTarget; reason: UnscannedReason; detail?: string };
