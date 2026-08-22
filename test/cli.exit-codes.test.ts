@@ -70,3 +70,20 @@ test('스캐너가 없어 스캔 0건이면 소견서가 "검사했지만 못 �
   const head = md.slice(0, md.indexOf('## 1.'));
   assert.match(head, /could not be scanned/, '스캔 실패는 문서 맨 아래가 아니라 맨 위에 있어야 한다');
 });
+
+// README 가 약속한 실행 형태가 실제로 되는지 — bin 경유 경로는 cli.js 직접 실행과 다른 코드다.
+test('bin/agenttrust.js 경유로도 동작한다(README 의 npx 경로)', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'agenttrust-bin-'));
+  writeFileSync(join(dir, '.mcp.json'), JSON.stringify({
+    mcpServers: { demo: { command: 'node', args: ['nonexistent-server.js'] } },
+  }));
+  const r = spawnSync('node', ['bin/agenttrust.js', 'scan', '--path', dir], { encoding: 'utf8' });
+  assert.equal(r.status, 0, `stderr: ${r.stderr}`);
+  assert.ok(existsSync(join(dir, 'agenttrust-findings.md')));
+});
+
+test('설정 0건일 때 bin 경유도 exit 1(문서와 실제가 일치)', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'agenttrust-bin-empty-'));
+  const r = spawnSync('node', ['bin/agenttrust.js', 'scan', '--path', dir], { encoding: 'utf8' });
+  assert.equal(r.status, 1);
+});

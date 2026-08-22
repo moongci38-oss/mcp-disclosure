@@ -113,5 +113,41 @@ $ ls bin/   → 디렉터리 없음 (package.json 의 bin.agenttrust 가 가리�
 ⚠️ `wiring-check.sh` 는 `normalize` 를 190곳으로 보고한다(오탐) — 위 import 그래프가 정본이다.
 하네스 갭 기록: `harness-gaps/2026-08-22-wiring-check-common-word-false-positive.md`
 
-- 다음: **Session 4 — Task 21~29**(판별력 테스트 3종 + `cli.ts` 배선 + 도그푸딩, 4 SP).
-  Task 25 가 파이프라인을 잇는 지점이고, Task 26 도그푸딩에서 실제 스캐너를 처음 붙인다.
+## P5 Session 4 진행상황 — 판별력 테스트 + 배선 + 도그푸딩 (4 SP)
+
+- [x] Task 21: 금지 술어 회귀 — 정확일치 + 대소문자/하이픈/동의어 + 발견 0건 경로 + 실측 경로
+- [x] Task 22: 시크릿 회귀 — sk-/중첩객체/JWT/authorization + 롤업 raw(threat_summary) + URL 자격증명
+- [x] Task 23: coverage fail-closed **역변조 실증** — `verified: mutation-kills-check(AC-03c)`
+- [x] Task 24: 원격 차단 E2E — spawn 주입 스파이(호출횟수·사유·혼합입력·argv 전량 검사)
+- [x] Task 25: `src/cli.ts` + `bin/agenttrust.js` — **전 모듈 배선 완료**
+  Spec 초안 대비 3곳 수정: ontology 를 cwd 아닌 모듈 기준으로 해석(안 그러면 `npx` 실행이 죽는다) ·
+  ontology 1회 읽기 · 직접 실행 가드(없으면 `node cli.js` 가 조용히 exit 0)
+- [x] Task 26: **도그푸딩** — 실제 스캐너 첫 연결. 24초, findings 167 / unscanned 0 / 미분류 0
+- [x] Task 27: `README.md` — 사용법 · 네트워크 0 · Known limitations 4종 · ADR-006 집행표
+
+### 🔴 도그푸딩이 잡은 것 (기록: `docs/dogfooding/2026-08-22-selfscan.md`)
+
+| # | 등급 | 내용 | 조치 |
+|--:|---|---|---|
+| ① | **치명** | 스캐너 부재로 **스캔 0건인데 기술축 5개를 "검사했지만 못 찾았다"로 보고** | `ScanOutcome` 신설(필수 인자) · 성사 0건이면 `scanner_cannot_detect` · 실패 배너를 문서 맨 위로 · 회귀 5건 |
+| ② | 높음 | 재현 메타 자리표시자(`unset`)가 `assertMetaComplete` 를 **무사통과** | 자리표시자 거부 · 실측된 부재는 `unavailable` 로 구분 · `target_hash` 실제 계산 |
+| ③ | 중간 | 1절이 ID 154개 통짜 나열 — 가장 중요한 절이 해시 덩어리 | 개수+표본 5개+`see JSON` |
+| ④ | 낮음 | `supportedScannerRange "0.x"` ↔ 실제 4.8.3 불일치 | **미조치** — 실측 버전이 하나뿐이라 범위 근거 없음. Spec §12 ⑥ 승계 |
+
+①이 이 세션의 핵심이다. **없는 폴더를 뒤져놓고 "양말이 없네"라고 한 셈**이고, 제품이 존재하는
+이유와 정반대되는 출력이었다. fixture 로는 절대 안 잡혔을 버그다 — 도그푸딩을 태스크로 못 박아
+둔 이유가 그대로 증명됐다.
+
+- **Session 4 완료** (2026-08-22). `npm test` **152/152 GREEN**.
+  ✅ **배선 완료** — `npx agenttrust scan` 이 실제로 소견서 2종을 생성한다(bin 경유 경로도 테스트).
+  판별력 실증(역변조 총 9회): ontology 검증 2종 · 팬아웃 · taxonomy 파싱 · taxonomy 우선순위 ·
+  unmatchedSignals · 3a 칸 · 버킷팅 가드 · assertCoverageComplete · ADR-006 차단.
+  전부 원복 확인, 잔재 grep 0건.
+
+### 남은 것
+
+- **Task 28~29 미착수** — Spec §8.5 의 Session 4 목록에 27번까지만 정의돼 있다(29 태스크 총계와
+  불일치). 다음 세션에서 Spec 태스크 번호 정합성을 먼저 확인할 것.
+- Spec §12 미결: ⑤(해소됨) · ⑥ fixture 디렉터리명/`supportedScannerRange` 정리 · ①npm 배포명
+- 실행 경로 중 **미검증**: 원격 대상 라이브 스캔 · 정적 JSON/패키지 대상 · `yara`/`vulnerable_package`
+  실발화(현재 crafted fixture 로만 확인)
