@@ -44,3 +44,17 @@ test('local 대상은 항상 argv 생성 — 실측 CLI 형태(config 서브커�
     assert.ok(!analyzerValue.split(',').includes(forbidden), `${forbidden} analyzer는 API/LLM 키를 요구해 로컬 전용 실행과 충돌한다`);
   }
 });
+
+test('analyzers 에 prompt_defense 가 포함된다 — 개정안 #01 §4.5', () => {
+  // 개정안 #01(2026-08-22 승인) 실측: prompt_defense 분석기는 API/LLM 키 없이 exit 0 으로
+  // 동작하며 threat_names 에 12종 카테고리를 정확 문자열로 싣는다. Session 1 의 analyzers
+  // 조합에서 누락돼 있었고, 그 결과 제품 간판 축(prompt_injection_defense)의 주 신호원이
+  // 통째로 빠져 있었다. 재현: docs/planning/SPEC-v0-cli-AMENDMENT-01-signal-map.md §2.2
+  const args = buildScannerArgs(localTarget, { allowRemote: false });
+  const analyzerValue = args![args!.indexOf('--analyzers') + 1].split(',');
+  assert.ok(analyzerValue.includes('prompt_defense'), 'prompt_defense 가 빠지면 12종 방어결여 신호가 전혀 오지 않는다');
+  // 키 불요 4종이 전부 있어야 15축 중 scannable 5축이 모두 신호를 받는다
+  for (const need of ['yara', 'readiness', 'vulnerable_package', 'prompt_defense']) {
+    assert.ok(analyzerValue.includes(need), `${need} 누락`);
+  }
+});

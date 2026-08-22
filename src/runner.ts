@@ -14,7 +14,15 @@ import type { ScanTarget, Unscanned, UnscannedReason } from './types.js';
 //   외부 키 불요)를 지키려면 API/LLM/VirusTotal 키가 필요 없는 analyzer만 명시로 고정해야 한다
 //   — yara(패턴탐지)·readiness(운영신뢰성 휴리스틱)·vulnerable_package(pip-audit 기반)는
 //   키 없이 로컬 실행이 확인됐다(실측: 3종 조합으로 exit 0, 유효 JSON 수신).
-const LOCAL_SAFE_ANALYZERS = ['yara', 'readiness', 'vulnerable_package'];
+//
+// 개정안 #01(2026-08-22 승인) 추가 실측: **prompt_defense 도 키 불요다.** 4종 조합으로
+// exit 0 · 62KB 유효 JSON · findings 154건을 확인했다. Session 1 이 이걸 빠뜨려서 제품
+// 간판 축(prompt_injection_defense)의 주 신호원이 통째로 없었다.
+// ⚠️ 출력에서 분석기 키가 **둘로 갈린다** — `prompt_defense_analyzer`(요청 이름으로 만들어진
+//    빈 자리, 항상 total_findings=0)와 `promptdefense_analyzer`(실제 finding 이 담기는 곳).
+//    스캐너 쪽 이름 불일치이며(report_generator.py:51 vs :65), ontology 의 signal_map 은
+//    반드시 후자를 키로 써야 한다. 재현: 개정안 문서 §2.2.
+const LOCAL_SAFE_ANALYZERS = ['yara', 'readiness', 'vulnerable_package', 'prompt_defense'];
 
 export function buildScannerArgs(target: ScanTarget, opts: { allowRemote: boolean }): string[] | null {
   if (target.transport === 'remote' && !opts.allowRemote) {

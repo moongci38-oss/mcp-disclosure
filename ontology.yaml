@@ -1,0 +1,176 @@
+# AgentTrust v0 — 커버리지 축 온톨로지
+#
+# 개정안 #01(2026-08-22 승인, docs/planning/SPEC-v0-cli-AMENDMENT-01-signal-map.md) 반영.
+# 구 `rule_map`(rule ID 키)은 폐기했다 — mcp-scanner 4.8.3 CLI 출력에 rule 식별자가 실리지
+# 않는다(report_generator.py:82 가 details["threat_type"] 만 직렬화). 키 공간은
+# `accepts_taxonomy`(AISubtech ID, 1순위) + `signal_map`((분석기 키, threat_name), 2순위)다.
+#
+# 두 상태 축을 구분한다:
+#   coverage      = 원리적으로 기계가 볼 수 있는 성격인가
+#   signal_status = 지금 우리 파이프라인에 신호가 실제로 오는가
+#
+# ⚠️ 분석기 키 주의: prompt_defense 를 요청하면 출력에 키가 둘 생긴다 —
+#   prompt_defense_analyzer(항상 0건, 유령) / promptdefense_analyzer(실제 finding).
+#   반드시 후자를 쓴다.
+version: 1
+
+axes:
+  # ============================================================
+  # scannable (5) — 스캐너가 직접 신호를 내는 축
+  # ============================================================
+  prompt_injection_defense:
+    coverage: scannable
+    claim_type: technical_control
+    signal_status: reachable
+    accepts_taxonomy:
+      - AISubtech-1.1.1   # Instruction Manipulation (Direct Prompt Injection) — YARA "PROMPT INJECTION" 실측
+    signal_map:
+      # 12종 카테고리 전부가 "이 방어가 없다"는 방어 결여 보고다 — 축이 하나이므로 '*' 로 배정한다.
+      # ⚠️ 이 분석기는 taxonomy 매칭에서 제외한다(§5.3) — DATA_LEAKAGE 방어결여가
+      #    secret_exposure 로 새어 나가면 소견서가 "시크릿이 노출됐다"고 잘못 말한다.
+      promptdefense_analyzer: "*"
+      yara_analyzer:
+        - PROMPT INJECTION
+
+  secret_exposure:
+    coverage: scannable
+    claim_type: technical_control
+    signal_status: reachable
+    accepts_taxonomy:
+      - AISubtech-8.2.3   # Data Exfiltration via Agent Tooling — YARA "CREDENTIAL HARVESTING" 실측
+    signal_map:
+      yara_analyzer:
+        - CREDENTIAL HARVESTING
+
+  vulnerable_deps:
+    coverage: scannable
+    claim_type: technical_control
+    signal_status: reachable
+    accepts_taxonomy: []   # 미발화(취약 의존성을 가진 대상 미확보) — 소스상 taxonomy 는 부여된다
+    signal_map:
+      # threat_type 이 상수 "VULNERABLE_DEPENDENCY" 하나뿐이고 CVE ID 는 출력에 안 남는다
+      # (vulnerable_package_analyzer.py:365) — 분석기 전체를 이 축으로 배정한다.
+      vulnerable_package_analyzer: "*"
+
+  malicious_pattern:
+    coverage: scannable
+    claim_type: technical_control
+    signal_status: reachable
+    accepts_taxonomy:
+      - AISubtech-9.1.1   # Code Execution — YARA "CODE EXECUTION" 실측
+      - AISubtech-9.1.2   # Unauthorized System Access — YARA "SYSTEM MANIPULATION" 실측
+    signal_map:
+      yara_analyzer:
+        - CODE EXECUTION
+        - INJECTION ATTACK
+        - SYSTEM MANIPULATION
+        - DATA EXFILTRATION
+        - TOOL POISONING
+
+  operational_reliability:
+    coverage: scannable
+    claim_type: technical_control
+    signal_status: reachable
+    accepts_taxonomy: []   # readiness 는 mcp_taxonomies 가 항상 빈 배열(실측)
+    signal_map:
+      # HEUR-001~020 의 rule_id 가 CLI 출력에서 소실되므로 세분화 불가 — 분석기 전체 배정.
+      readiness_analyzer: "*"
+
+  # ============================================================
+  # partial (5) — 원리적으로는 스캔 가능하나 이 스캐너 CLI 로는 신호가 0
+  # ============================================================
+  tool_permission:
+    coverage: partial
+    claim_type: technical_control
+    signal_status: unreachable_in_v0
+    unreachable_reason: >-
+      readiness 분석기 HEUR-018 의 rule_id 가 mcp-scanner 4.8.3 CLI 출력에서 소실되고
+      (report_generator.py:82), 개발계획이 가정한 destructive_capabilities YARA 룰은
+      존재하지 않는다(룰 파일 10개 전수 확인). 축 자체는 스캔 가능한 성격이나
+      이 스캐너 CLI 로는 신호를 받을 수 없다.
+
+  auth_oauth:
+    coverage: partial
+    claim_type: technical_control
+    signal_status: unreachable_in_v0
+    unreachable_reason: >-
+      readiness 분석기 HEUR-019 의 rule_id 가 mcp-scanner 4.8.3 CLI 출력에서 소실된다
+      (report_generator.py:82). 축 자체는 스캔 가능한 성격이나 이 스캐너 CLI 로는
+      신호를 받을 수 없다.
+
+  data_flow:
+    coverage: partial
+    claim_type: technical_control
+    signal_status: unreachable_in_v0
+    unreachable_reason: >-
+      taint-tracking 계열 신호를 내는 분석기를 아직 확인하지 못했다. mcp-scanner 4.8.3 의
+      키 불요 분석기 4종(yara, readiness, vulnerable_package, prompt_defense) 중 이 축에
+      대응하는 신호를 내는 것이 없다.
+
+  logging:
+    coverage: partial
+    claim_type: technical_control
+    signal_status: unreachable_in_v0
+    unreachable_reason: >-
+      readiness 분석기 HEUR-015 의 rule_id 가 mcp-scanner 4.8.3 CLI 출력에서 소실된다
+      (report_generator.py:82). 축 자체는 스캔 가능한 성격이나 이 스캐너 CLI 로는
+      신호를 받을 수 없다.
+
+  sdlc:
+    coverage: partial
+    claim_type: technical_control
+    signal_status: unreachable_in_v0
+    unreachable_reason: >-
+      빌드·릴리스 파이프라인 신호를 내는 분석기를 아직 확인하지 못했다. mcp-scanner 4.8.3 의
+      키 불요 분석기 4종 중 이 축에 대응하는 신호를 내는 것이 없다.
+
+  # ============================================================
+  # not_scannable (5) — 조직·계약 문서 영역(기술 신호의 대상이 아님)
+  # ============================================================
+  incident_response:
+    coverage: not_scannable
+    claim_type: policy_proof
+    signal_status: not_applicable
+    evidence_request: "Incident response runbook / SLA document (detection→response→post-mortem process)"
+
+  data_retention:
+    coverage: not_scannable
+    claim_type: policy_proof
+    signal_status: not_applicable
+    evidence_request: "Data retention policy document (retention period, deletion procedure)"
+
+  subprocessor:
+    coverage: not_scannable
+    claim_type: policy_proof
+    signal_status: not_applicable
+    evidence_request: "Subprocessor (4th-party vendor) disclosure document"
+
+  training_data:
+    coverage: not_scannable
+    claim_type: policy_proof
+    signal_status: not_applicable
+    evidence_request: "Model training-data usage policy statement (from LLM provider or self)"
+
+  dpa:
+    coverage: not_scannable
+    claim_type: policy_proof
+    signal_status: not_applicable
+    evidence_request: "Data Processing Agreement (DPA) document"
+
+# 소견서 어디에도 쓰지 않는 술어(PRD-v2 §1 — CPA 자격 영역 침범 금지)
+forbidden_predicates:
+  - "보장"
+  - "안전"
+  - "완전"
+  - "검증됨"
+  - "certified"
+  - "감사 통과"
+  - "컴플라이언스 완료"
+  - "guaranteed"
+  - "audit-passed"
+  - "compliance complete"
+
+required_disclaimers:
+  no_finding: "No findings ≠ proof of safety — undetected as of {scanned_at}, per {scanner} {version}"
+  self_attested: "This scan is self-attested — run by the assessed organization itself, not an independent third party"
+  genre: "Notice: procurement-style questionnaires (e.g., Microsoft SSPA) may have zero questions answerable by this report."
