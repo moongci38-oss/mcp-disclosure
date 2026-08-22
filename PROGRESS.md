@@ -16,3 +16,7 @@
   CLI 플래그/exit code/raw 스키마를 실측(브리프의 "미설치 가능성" 예상과 달리 설치 성공).
   buildScannerArgs/classifyScannerFailure/parseScannerRawEnvelope를 실측 결과로 재작성.
   상세: docs/scanner-exit-codes.md, IMPL-NOTES.md. 전체 22/22 pass.
+
+- **Session 1 완료** (2026-08-22). 총 11개 커밋(Task 1~8b, IMPL-NOTES 발견 기록 1건 추가).
+  `npm test` 22/22 GREEN. bare `node --test`는 Node 22의 TS 자동탐색 이슈로 8건 실패(원인은
+  구현 결함이 아님 — IMPL-NOTES.md 참조), `npm test`(Spec 정의 검증 경로)로는 전건 GREEN.
