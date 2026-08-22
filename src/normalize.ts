@@ -117,3 +117,62 @@ export function assignAxis(input: AxisInput, axisTable: AxisTable): CoverageAxis
   // ③ 미분류
   return null;
 }
+
+// --- src/normalize.ts (통합 — normalize() + computeUnmatchedSignals, Task 15) ---
+import { redact } from './masking.js';
+import type { Finding, ScannerMeta } from './types.js';
+
+// A-4 codex 반영(개정안 #01로 키 공간 교체): 종전 normalize() 는 unmatchedSignals 를 항상 []로
+// 반환했다 — "오타난 신호명이 조용히 묻힌다"는 지적이 정확히 이 코드였다.
+//
+// ⚠️ 이 신호가 의미하는 것: **"이번 스캔에서 0건" ≠ "오타"** — 정상적으로 무관한 축의 신호는
+//    늘 0건이다. 여러 번의 스캔에서 *항상* 0건인 신호를 오타 후보로 의심하는 것이 올바른
+//    사용법이다(§9.6).
+// ⚠️ `'*'` 배정은 집계 대상에서 뺀다 — 그 분석기가 이번에 아무것도 못 냈다는 사실은 "온톨로지
+//    오타"가 아니라 "그 축이 깨끗하다"는 정상 결과이고, 소견서의 다른 칸이 이미 말한다.
+type SignalKey = { label: string; match: (f: RawFinding) => boolean };
+
+function collectAllSignals(axisTable: AxisTable): SignalKey[] {
+  const keys: SignalKey[] = [];
+  for (const [axis, entry] of Object.entries(axisTable) as [CoverageAxis, AxisTable[CoverageAxis]][]) {
+    for (const t of entry.accepts_taxonomy ?? []) {
+      keys.push({ label: `${axis}.accepts_taxonomy["${t}"]`, match: f => f.taxonomy === t });
+    }
+    for (const [analyzer, names] of Object.entries(entry.signal_map ?? {})) {
+      if (names === '*') continue; // 위 주석 참조
+      for (const n of names) {
+        keys.push({
+          label: `${axis}.signal_map.${analyzer}["${n}"]`,
+          match: f => f.analyzer === analyzer && f.threatName === n,
+        });
+      }
+    }
+  }
+  return keys;
+}
+
+export function computeUnmatchedSignals(rawFindings: RawFinding[], axisTable: AxisTable): string[] {
+  return collectAllSignals(axisTable)
+    .filter(k => !rawFindings.some(f => k.match(f)))
+    .map(k => k.label);
+}
+
+export function normalize(
+  rawFindings: RawFinding[], axisTable: AxisTable, meta: ScannerMeta,
+): { findings: Finding[]; unmatchedSignals: string[] } {
+  const { grouped } = groupAndAssignMatchIndex(rawFindings);
+  const findings: Finding[] = grouped.map(f => ({
+    id: computeStableId(meta.name, meta.version, f.rule, f.target, f.line, f.match_index),
+    severity: (f.severity as Finding['severity']) ?? 'info',
+    axis: assignAxis({ analyzer: f.analyzer, threatName: f.threatName, taxonomy: f.taxonomy }, axisTable),
+    rule: f.rule,
+    target: f.target,
+    line: f.line,
+    match_index: f.match_index,
+    duplicate_count: f.duplicate_count,
+    taxonomy: f.taxonomy,
+    scanner_meta: meta,
+    raw: redact(f.raw),
+  }));
+  return { findings, unmatchedSignals: computeUnmatchedSignals(rawFindings, axisTable) };
+}

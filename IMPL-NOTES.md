@@ -62,3 +62,21 @@
   문자열로 낸다 — Session 1의 `--analyzers` 조합에서 빠져 있었다.
   → 개정안: `docs/planning/SPEC-v0-cli-AMENDMENT-01-signal-map.md` (**[STOP] 승인 대기 — 승인 전
   Task 9 착수 금지**). 재현 명령·원본 출력: 그 문서 §2 · `docs/measurements/2026-08-22-signal-space/`
+
+- **Session 2 구현 중 발견 (2026-08-22)**
+  1. **테스트 fixture 자체가 틀려서 검증 경로를 안 타는 사례.** `assignAxis` 의 "taxonomy 가
+     signal_map 을 이긴다" 충돌 테스트에서 `AISubtech-1.1.1` 을 충돌값으로 썼는데, 그 ID 는
+     이미 `prompt_injection_defense` 소유라 선언 순서상 그쪽이 먼저 이겼다 — 테스트는
+     **통과했지만 검증하려던 경로를 타지 않았다.** 소유자 없는 `AISubtech-4.1.1` 로 교체.
+     교훈: 충돌 fixture 에는 **아무도 소유하지 않은 값**을 써야 한다. Spec §8.5 Task 13·17 에도
+     같은 정정을 반영했다.
+  2. **`wiring-check.sh` 가 흔한 영어 단어 심볼에서 과다 계상한다.** `normalize` → 190곳으로
+     보고하지만 실제 프로덕션 소비처는 1곳이다(node_modules·dist·문서 산문까지 긁는 것으로 보임).
+     반대로 `assignAxis` 는 0곳으로 나왔는데 실제로는 1곳에서 호출된다(과소 계상). 완료 보고에
+     이 숫자를 필수로 적게 돼 있어 그대로 믿으면 틀린 숫자가 커밋 메시지에 박힌다 — 프로젝트
+     `src/`·`bin/` 한정 grep 으로 교차 확인할 것.
+     하네스 갭 기록: `harness-gaps/2026-08-22-wiring-check-common-word-false-positive.md`
+  3. **`--analyzers` 에 `prompt_defense` 를 넣으면 출력 분석기 키가 둘로 갈린다** —
+     `prompt_defense_analyzer`(항상 0건 유령) / `promptdefense_analyzer`(실제 finding).
+     스캐너 쪽 이름 불일치(`report_generator.py:51` vs `:65`)이며, 파서의 `total_findings<=0`
+     스킵이 유령을 걸러준다. ontology 의 `signal_map` 은 **반드시 후자**를 키로 써야 한다.

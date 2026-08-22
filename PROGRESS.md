@@ -39,5 +39,38 @@
   ⚠️ **배선: 0곳** (재현: `wiring-check.sh loadAxisTable`) — 소비처(`cli.ts`)는 Task 25 다.
   만들었지만 아직 아무도 부르지 않는다.
 
-- 다음: Task 11~12(normalize 1/3·2/3) — **착수 전 Spec §12 미결 ⑤ 선처리 필수**
-  (`RawFinding` 에 `analyzer`/`threatName` 분리 + `mcp_taxonomies` 객체 파싱 버그)
+- [x] **Spec §12 미결 ⑤ 선처리** — `RawFinding` 에 `analyzer`/`threatName` 분리 + threat_name
+  단위 팬아웃 + `mcp_taxonomies` 객체 파싱 **잠복 버그** 수정 — commit 86c6403 (49/49)
+  fixture 추가: `raw-envelope-yara-fired.json`(실측 발췌 — YARA 발화 4건 + 4분석기 1건)
+- [x] Task 11: `groupAndAssignMatchIndex` — 해시 정렬 그룹핑 + 중복 접기 — commit 178868b
+- [x] Task 12: `computeStableId` — sha256 16자, 셔플 재현성 — commit 178868b
+- [x] Task 13: `assignAxis` 3단 폴백(taxonomy → signal_map → null) — commit 178868b
+  ⚠️ 테스트 작성 중 실제 오류 1건 자체 발견: 충돌 fixture 로 쓴 `AISubtech-1.1.1` 이 이미
+  `prompt_injection_defense` 소유라 검증하려던 경로를 안 탔다 → 소유자 없는 `AISubtech-4.1.1` 로 교체
+- [x] Task 14: `redact` 마스킹 파이프 — KEY_DENYLIST + JWT 패턴 + 엔트로피 2차 방어선
+- [x] Task 15: `normalize()` 통합 + `computeUnmatchedSignals` — **전체 91/91 GREEN**
+
+- **Session 2 완료** (2026-08-22). Task 9~15 (6 SP) + Spec 개정 게이트 + §12 미결 ⑤ 선처리.
+  커밋 5개. `npm test` **91/91 GREEN**(Session 1 대비 +69건).
+  엔드투엔드 확인: 실측 봉투 fixture → 파서 → normalize → **17건 전건 분류, 미분류 0건**
+  (prompt_injection_defense 13 / malicious_pattern 2 / secret_exposure 1 / operational_reliability 1).
+  판별력 실증(역변조 5회): ontology 검증 2종·팬아웃·taxonomy 파싱·taxonomy 우선순위·
+  unmatchedSignals 집계를 각각 깨뜨려 대응 테스트가 죽는 것을 확인. 잔재 grep 0건.
+
+### ⚠️ 배선 현황 (완료 아님 — 정직 표기)
+
+| 심볼 | 프로덕션 소비처 | 상태 |
+|---|--:|---|
+| `assignAxis`·`redact`·`computeStableId`·`groupAndAssignMatchIndex`·`computeUnmatchedSignals` | 1~2곳 | ✅ `normalize()` 가 소비 |
+| `normalize` | 0곳 | ⛔ 미배선 |
+| `loadAxisTable` | 0곳 | ⛔ 미배선 |
+| `parseScannerRawEnvelope` | 0곳 | ⛔ 미배선 |
+
+셋의 소비처는 `src/cli.ts` (**Task 25, Session 4**) 다 — 아직 파이프라인 전체를 잇는 코드가 없다.
+재현: `grep -rn '\bnormalize\b' src/ bin/ | grep -v 'export function'`
+⚠️ `wiring-check.sh normalize` 는 **190곳**을 보고하는데 이는 오탐이다(흔한 영어 단어라
+node_modules·문서까지 긁는다). 하네스 갭으로 기록:
+`forge-outputs/11-platform/pipelines/harness-gaps/2026-08-22-wiring-check-common-word-false-positive.md`
+
+- 다음: **Session 3 — Task 16~19**(클레임 매핑 + 커버리지 3칸 렌더, 5 SP).
+  Task 19 render 는 개정안 #01 의 `unreachable_reason` 을 소견서에 출력해야 한다.
