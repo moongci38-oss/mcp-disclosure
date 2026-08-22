@@ -2,3 +2,5 @@
 .claude/state/
 node_modules/
 dist/
+.claude/handover/
+.claude/session-plans/
