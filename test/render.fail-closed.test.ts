@@ -13,7 +13,7 @@ const AXIS_TABLE = loadAxisTable(ONTOLOGY);
 const META = { name: 'cisco-mcp-scanner', version: '4.8.3', ruleset_hash: 'abc', scanned_at: '2026-08-22T00:00:00Z', target_hash: 'def', python_version: '3.12.0' };
 const base = () => {
   const { findings } = normalize([], AXIS_TABLE, META);
-  return { findings, claims: mapFindingsToClaims(findings, AXIS_TABLE) };
+  return { findings, claims: mapFindingsToClaims(findings, AXIS_TABLE, { attempted: 1, scanned: 1 }) };
 };
 const opts = { allowRemote: false, usedRemoteCount: 0 };
 
@@ -53,4 +53,23 @@ test('알 수 없는 술어의 클레임이 섞이면 RenderError(칸 배정 유
 test('원격 스캔 수행 시에도 정상 렌더(배너 삽입 로직이 있으면 throw 안 함)', () => {
   const { findings, claims } = base();
   assert.doesNotThrow(() => render(claims, findings, META, [], [], { allowRemote: true, usedRemoteCount: 1 }, ONTOLOGY));
+});
+
+// 도그푸딩 Task 26 회귀 — 자리표시자가 게이트를 무사통과하던 fail-open.
+// "가드가 있다"와 "가드가 막는다"는 다른 주장이다.
+test('자리표시자 메타(unset/unknown)는 RenderError — 빈 문자열만 막는 게 아니다', () => {
+  const { findings, claims } = base();
+  for (const v of ['unset', 'unknown', 'N/A', 'TBD', '-']) {
+    assert.throws(
+      () => render(claims, findings, { ...META, ruleset_hash: v } as any, [], [], opts, ONTOLOGY),
+      RenderError, `"${v}" 가 재현 메타로 통과했다`);
+  }
+});
+
+test('"unavailable: <이유>" 는 통과한다 — 실측된 부재는 정직한 값이다', () => {
+  const { findings, claims } = base();
+  const meta = { ...META, ruleset_hash: 'unavailable: scanner does not expose a ruleset identifier' };
+  assert.doesNotThrow(() => render(claims, findings, meta, [], [], opts, ONTOLOGY));
+  const { markdown } = render(claims, findings, meta, [], [], opts, ONTOLOGY);
+  assert.ok(markdown.includes('unavailable:'), '부재 사유가 소견서에 그대로 보여야 읽는 쪽이 안다');
 });

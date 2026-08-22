@@ -16,10 +16,24 @@ export function assertCoverageComplete(claims: Claim[]): void {
 }
 
 /** 재현 메타 결손 — 재현할 수 없는 소견서는 소견서가 아니다(AC-02b). */
+// ⚠️ 도그푸딩 Task 26 발견 — 종전 검사는 "빈 문자열이 아니면 통과"였다. 그래서 개발 중 자리표시자
+// 'unset'/'unknown' 이 그대로 실린 소견서가 이 게이트를 **무사통과**했다. 가드가 있는데 아무것도
+// 막지 않는, 이 프로젝트가 계속 경계해 온 바로 그 패턴이다.
+// 구분을 강제한다: **'unset' = 개발자가 안 채운 것(실패)** / **'unavailable…' = 실측된 부재(통과)**.
+// 후자는 소견서에 그대로 찍혀서 읽는 사람이 "이 값은 원래 못 얻는다"를 알게 된다.
+const PLACEHOLDER_VALUES = new Set(['unset', 'unknown', 'n/a', 'tbd', '-']);
+
 export function assertMetaComplete(meta: ScannerMeta): void {
   const missing = REQUIRED_META_FIELDS.filter(f => !meta[f]);
   if (missing.length > 0) {
     throw new RenderError(`Reproducibility metadata missing: ${missing.join(', ')}`);
+  }
+  const placeholders = REQUIRED_META_FIELDS.filter(f => PLACEHOLDER_VALUES.has(String(meta[f]).trim().toLowerCase()));
+  if (placeholders.length > 0) {
+    throw new RenderError(
+      `Reproducibility metadata still holds placeholder values: ${placeholders.join(', ')} — ` +
+      `use a real value, or "unavailable: <why>" if the scanner genuinely does not expose it`,
+    );
   }
 }
 
@@ -66,12 +80,29 @@ export function render(
   lines.push(`**${disclaimers.self_attested}**`);
   lines.push(`Scanner: ${meta.name} ${meta.version} · Ruleset: ${meta.ruleset_hash} · Scanned: ${meta.scanned_at} · Target: ${meta.target_hash} · Python: ${meta.python_version}`);
   lines.push(remoteBanner);
+  // 스캔이 부분/전부 실패했다는 사실은 **맨 위**에 있어야 한다. 종전에는 "Unscanned items" 가
+  // 문서 맨 아래에 한 줄로만 있었고, 그 위 2절은 태연히 "검사했지만 못 찾았다"고 말하고 있었다
+  // (도그푸딩 Task 26 발견). 읽는 사람의 주의력에 정직성을 맡기지 않는다.
+  if (unscanned.length > 0) {
+    lines.push(`\n> **${unscanned.length} target(s) could not be scanned.** ` +
+      `Axes below are reported only for targets that were actually scanned — see "Unscanned items".\n`);
+  }
   // A-3 codex 반영 — 스캐너 버전이 지원 범위 밖일 때의 경고(cli.ts 가 채워 넘긴다)
   for (const w of scannerWarnings) lines.push(`> ⚠️ ${w}`);
   lines.push(`> ${disclaimers.genre}`);
 
   lines.push('\n## 1. What we scanned and found');
-  for (const c of scannableFound) if (c.type === 'technical_control') lines.push(`- **${c.axis}**: ${c.finding_ids.length} finding(s) — ${c.finding_ids.join(', ')}`);
+  // ⚠️ 도그푸딩 Task 26 발견: 실제 스캔에서 한 축에 154건이 나왔고, ID 를 전부 나열하니 소견서에서
+  // 가장 중요한 절이 해시 덩어리 한 줄이 됐다. 사람이 못 읽는 정직함은 전달되지 않는다.
+  // 전량은 JSON 이 갖고, markdown 은 개수 + 표본만 보여준다.
+  const ID_SAMPLE = 5;
+  for (const c of scannableFound) {
+    if (c.type !== 'technical_control') continue;
+    const n = c.finding_ids.length;
+    const shown = c.finding_ids.slice(0, ID_SAMPLE).join(', ');
+    const tail = n > ID_SAMPLE ? `, … (+${n - ID_SAMPLE} more — see JSON \`findings\`)` : '';
+    lines.push(`- **${c.axis}**: ${n} finding(s) — ${shown}${tail}`);
+  }
 
   lines.push('\n## 2. What we scanned but did not find');
   lines.push(noFindingText);
@@ -84,8 +115,10 @@ export function render(
     lines.push('\n### 3a. Technical axes this scanner cannot report on');
     for (const c of cannotDetect) {
       if (c.type !== 'technical_control') continue;
-      const reason = c.unreachable_reason?.trim() || 'reason not recorded';
-      lines.push(`- **${c.axis}**: not observable via this scanner — ${reason.replace(/\s+/g, ' ')}`);
+      // 접두사를 고정하지 않는다 — 사유마다 종류가 다르기 때문이다(도구 한계 vs 스캔 실패).
+      // 한 접두사로 묶으면 "not observable — the scan did not complete" 같은 어색한 이중 서술이 된다.
+      const reason = (c.unreachable_reason?.trim() || 'Reason not recorded.').replace(/\s+/g, ' ');
+      lines.push(`- **${c.axis}**: ${reason}`);
     }
   }
   lines.push('\n### 3b. Organizational / contractual evidence required');

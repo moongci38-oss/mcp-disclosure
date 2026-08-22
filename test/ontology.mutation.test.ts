@@ -65,7 +65,7 @@ test('mutation — logging 을 reachable 로 뒤집으면 술어가 cannot_detec
   const predicateOf = (parsed: any) => {
     const table = loadAxisTable(parsed);
     const { findings } = normalize([], table, META);
-    return (mapFindingsToClaims(findings, table).find(c => c.axis === 'logging') as any).predicate;
+    return (mapFindingsToClaims(findings, table, { attempted: 1, scanned: 1 }).find(c => c.axis === 'logging') as any).predicate;
   };
   assert.equal(predicateOf(base), 'scanner_cannot_detect');
 

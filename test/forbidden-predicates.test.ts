@@ -21,7 +21,7 @@ function escapeRegex(s: string): string {
 
 function outputs(raw: Parameters<typeof normalize>[0]) {
   const { findings, unmatchedSignals } = normalize(raw, AXIS_TABLE, META);
-  const claims = mapFindingsToClaims(findings, AXIS_TABLE);
+  const claims = mapFindingsToClaims(findings, AXIS_TABLE, { attempted: 1, scanned: 1 });
   return render(claims, findings, META, [], unmatchedSignals, { allowRemote: true, usedRemoteCount: 1 }, ONTOLOGY,
     ['scanner version 9.9.9 is outside the supported range']);
 }

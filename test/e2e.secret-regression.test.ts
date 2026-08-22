@@ -15,7 +15,7 @@ const META = { name: 'cisco-mcp-scanner', version: '4.8.3', ruleset_hash: 'abc',
 function outputs(raw: Record<string, unknown>, target = 'srv-a') {
   const findingsRaw = [{ analyzer: 'yara_analyzer', threatName: 'CREDENTIAL HARVESTING', rule: 'yara_analyzer:CREDENTIAL HARVESTING', target, raw }];
   const { findings, unmatchedSignals } = normalize(findingsRaw, AXIS_TABLE, META);
-  const claims = mapFindingsToClaims(findings, AXIS_TABLE);
+  const claims = mapFindingsToClaims(findings, AXIS_TABLE, { attempted: 1, scanned: 1 });
   return render(claims, findings, META, [], unmatchedSignals, { allowRemote: false, usedRemoteCount: 0 }, ONTOLOGY);
 }
 

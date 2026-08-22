@@ -10,7 +10,7 @@ import { normalize } from '../src/normalize.js';
 const AXIS_TABLE = loadAxisTable(yaml.load(readFileSync('ontology.yaml', 'utf8')));
 const META = { name: 'cisco-mcp-scanner', version: '4.8.3', ruleset_hash: 'abc', scanned_at: '2026-08-22T00:00:00Z', target_hash: 'def', python_version: '3.12.0' };
 const claimsFor = (raw: Parameters<typeof normalize>[0]) =>
-  mapFindingsToClaims(normalize(raw, AXIS_TABLE, META).findings, AXIS_TABLE);
+  mapFindingsToClaims(normalize(raw, AXIS_TABLE, META).findings, AXIS_TABLE, { attempted: 1, scanned: 1 });
 
 test('항상 정확히 15개 클레임(1축당 1개) 생성', () => {
   assert.equal(claimsFor([]).length, ALL_AXES.length);
@@ -25,7 +25,7 @@ test('negative fixture — 무관 finding 만 → 무관 축에 기술통제 클
   const raw = [{ analyzer: 'unknown_analyzer', threatName: 'NOPE', rule: 'unknown_analyzer:NOPE', target: 'srv-a', taxonomy: 'AISubtech-99.9.9', raw: {} }];
   const { findings } = normalize(raw, AXIS_TABLE, META);
   assert.equal(findings[0].axis, null);
-  const c = mapFindingsToClaims(findings, AXIS_TABLE).find(x => x.axis === 'prompt_injection_defense')!;
+  const c = mapFindingsToClaims(findings, AXIS_TABLE, { attempted: 1, scanned: 1 }).find(x => x.axis === 'prompt_injection_defense')!;
   assert.equal((c as any).predicate, 'scanner_not_detected');
   assert.deepEqual((c as any).finding_ids, [], '미분류 finding 이 어떤 클레임에도 딸려가면 안 된다');
 });
@@ -70,4 +70,37 @@ test('finding_ids 는 그 축에 배정된 finding 만 담는다(오매핑 없�
   assert.equal(se.finding_ids.length, 1);
   assert.equal(or.finding_ids.length, 1);
   assert.notEqual(se.finding_ids[0], or.finding_ids[0]);
+});
+
+// ============================================================
+// 도그푸딩 Task 26 회귀 — "스캔이 아예 안 됐는데 깨끗하다고 말하는" 버그
+// 실제로 있었던 버그다: 스캐너 바이너리가 없어 0건 스캔됐는데 소견서는 기술축 5개에
+// "검사했지만 못 찾았다"를 찍었다. 이 제품이 존재하는 이유와 정확히 반대되는 출력이다.
+// ============================================================
+test('한 건도 스캔되지 않으면 기술축은 not_detected 가 아니라 cannot_detect 다', () => {
+  const claims = mapFindingsToClaims([], AXIS_TABLE, { attempted: 1, scanned: 0 });
+  const technical = claims.filter(c => c.type === 'technical_control') as any[];
+  assert.equal(technical.length, 10);
+  assert.ok(technical.every(c => c.predicate === 'scanner_cannot_detect'),
+    '스캔이 일어나지 않았는데 "검사했고 못 찾았다"고 말하면 거짓 진술이다');
+  assert.ok(technical.every(c => c.unreachable_reason?.trim()), '왜 확인 못 했는지가 반드시 있어야 한다');
+});
+
+test('스캔 실패 사유에 시도 대상 수와 다음 확인 지점이 들어간다', () => {
+  const c = mapFindingsToClaims([], AXIS_TABLE, { attempted: 3, scanned: 0 })
+    .find(x => x.axis === 'secret_exposure') as any;
+  assert.match(c.unreachable_reason, /3 target\(s\)/);
+  assert.match(c.unreachable_reason, /Unscanned items/);
+});
+
+test('일부라도 스캔됐으면 정상 판정으로 돌아간다(과잉 방어 금지)', () => {
+  const claims = mapFindingsToClaims([], AXIS_TABLE, { attempted: 2, scanned: 1 });
+  const se = claims.find(c => c.axis === 'secret_exposure') as any;
+  assert.equal(se.predicate, 'scanner_not_detected', '1건이라도 스캔했으면 그 결과는 유효하다');
+});
+
+test('attempted 0(대상 없음)은 정상 경로로 둔다 — CLI 가 그 전에 exit 1 한다', () => {
+  const se = mapFindingsToClaims([], AXIS_TABLE, { attempted: 0, scanned: 0 })
+    .find(c => c.axis === 'secret_exposure') as any;
+  assert.equal(se.predicate, 'scanner_not_detected');
 });

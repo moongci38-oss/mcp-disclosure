@@ -17,7 +17,7 @@ const opts = { allowRemote: false, usedRemoteCount: 0 };
 
 function reportOf(raw: Parameters<typeof normalize>[0] = [], extra: Partial<{ unmatched: string[]; warnings: string[]; usedRemoteCount: number }> = {}) {
   const { findings, unmatchedSignals } = normalize(raw, AXIS_TABLE, META);
-  const claims = mapFindingsToClaims(findings, AXIS_TABLE);
+  const claims = mapFindingsToClaims(findings, AXIS_TABLE, { attempted: 1, scanned: 1 });
   return render(
     claims, findings, META, [], extra.unmatched ?? unmatchedSignals,
     { allowRemote: false, usedRemoteCount: extra.usedRemoteCount ?? 0 }, ONTOLOGY, extra.warnings ?? [],
@@ -62,7 +62,7 @@ test('신호원 0인 5축이 3a 칸에 사유와 함께 나온다(감추지 않�
   const md = reportOf().markdown;
   assert.ok(md.includes('3a. Technical axes this scanner cannot report on'));
   for (const axis of ['tool_permission', 'auth_oauth', 'data_flow', 'logging', 'sdlc']) {
-    assert.ok(md.includes(`**${axis}**: not observable via this scanner`), `${axis} 가 소견서에서 사라졌다`);
+    assert.ok(md.includes(`**${axis}**: Not observable via this scanner.`), `${axis} 가 소견서에서 사라졌다`);
   }
   assert.ok(md.includes('HEUR-015'), '사유에 근거(어느 rule_id 가 소실됐는지)가 있어야 확인 가능하다');
 });
@@ -120,4 +120,28 @@ test('3a(도구 한계) 절에는 체크박스를 달지 않는다', () => {
   const md = reportOf().markdown;
   const sec3a = md.slice(md.indexOf('### 3a.'), md.indexOf('### 3b.'));
   assert.ok(!sec3a.includes('- [ ]'), '도구 한계에 체크박스를 달면 "서류 내면 되는 것"으로 읽힌다');
+});
+
+// 도그푸딩 Task 26 발견 — 실제 스캔에서 한 축에 154건이 나와 ID 나열이 해시 덩어리가 됐다.
+test('finding ID 는 표본만 보여주고 전량은 JSON 으로 넘긴다(가독성)', () => {
+  const many = Array.from({ length: 30 }, (_, i) => ({
+    analyzer: 'yara_analyzer', threatName: 'CREDENTIAL HARVESTING',
+    rule: 'yara_analyzer:CREDENTIAL HARVESTING', target: `srv-${i}`, raw: { i },
+  }));
+  const { markdown, json } = reportOf(many);
+  const line = markdown.split('\n').find(l => l.includes('**secret_exposure**'))!;
+  assert.ok(line.includes('30 finding(s)'), '개수는 정확히 보여야 한다');
+  assert.ok(line.includes('(+25 more'), '나머지는 개수로만 알린다');
+  assert.ok(line.length < 400, `1절 한 줄이 너무 길다(${line.length}자) — 읽히지 않는 정직함은 전달되지 않는다`);
+  assert.equal(JSON.parse(json).findings.length, 30, '전량은 JSON 이 갖는다');
+});
+
+test('5건 이하면 생략 표기 없이 전부 보여준다', () => {
+  const few = Array.from({ length: 3 }, (_, i) => ({
+    analyzer: 'yara_analyzer', threatName: 'CREDENTIAL HARVESTING',
+    rule: 'yara_analyzer:CREDENTIAL HARVESTING', target: `srv-${i}`, raw: { i },
+  }));
+  const line = reportOf(few).markdown.split('\n').find(l => l.includes('**secret_exposure**'))!;
+  assert.ok(line.includes('3 finding(s)'));
+  assert.ok(!line.includes('more'), '3건뿐인데 "더 있음"이라고 하면 안 된다');
 });

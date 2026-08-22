@@ -74,6 +74,16 @@ export type Claim =
   | { type: 'operational_practice'; axis: CoverageAxis; evidence_request: string }
   | { type: 'policy_proof';        axis: CoverageAxis; evidence_request: string };
 
+// --- 스캔 성사 여부 (도그푸딩 Task 26 발견 — 2026-08-22) ---
+// ⚠️ **이 타입이 없어서 최악의 버그가 있었다.** 스캐너 바이너리가 없어 단 한 건도 스캔되지
+// 않았는데, 소견서는 5개 기술축에 대해 "검사했지만 못 찾았다"고 적었다. 스캔이 아예 일어나지
+// 않은 것을 "깨끗함"으로 보고한 것이다 — 이 제품이 존재하는 이유와 정확히 반대되는 출력이다.
+// (Unscanned 항목은 40줄 아래에 한 줄 있었지만, 그건 읽는 쪽의 주의력에 기대는 설계다.)
+export type ScanOutcome = {
+  attempted: number;  // 스캔을 시도한 대상 수
+  scanned: number;    // 실제로 스캐너 출력을 받아낸 대상 수
+};
+
 // --- §5.7 ScanTarget / Unscanned ---
 export type Transport = 'local_stdio' | 'remote';
 export type TargetKind = 'mcp_server' | 'agent_def' | 'hook' | 'permission';

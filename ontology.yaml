@@ -86,7 +86,7 @@ axes:
     # (ko) HEUR-018 rule_id 가 CLI 출력에서 소실 + destructive_capabilities YARA 룰 부재.
     # ⚠️ 이 필드는 소견서에 그대로 실린다 — Spec §0 에 따라 **영문으로 쓴다**.
     unreachable_reason: >-
-      readiness rule id HEUR-018 is dropped from mcp-scanner 4.8.3 CLI output
+      Not observable via this scanner. readiness rule id HEUR-018 is dropped from mcp-scanner 4.8.3 CLI output
       (report_generator.py:82 serializes only details["threat_type"]), and the
       assumed destructive_capabilities YARA rule does not exist (all 10 rule files
       checked). The axis is technically scannable, but this scanner's CLI emits no
@@ -98,7 +98,7 @@ axes:
     signal_status: unreachable_in_v0
     # (ko) HEUR-019 rule_id 가 CLI 출력에서 소실.
     unreachable_reason: >-
-      readiness rule id HEUR-019 is dropped from mcp-scanner 4.8.3 CLI output
+      Not observable via this scanner. readiness rule id HEUR-019 is dropped from mcp-scanner 4.8.3 CLI output
       (report_generator.py:82). The axis is technically scannable, but this
       scanner's CLI emits no signal for it.
 
@@ -108,7 +108,7 @@ axes:
     signal_status: unreachable_in_v0
     # (ko) taint-tracking 신호를 내는 분석기를 아직 확인하지 못했다.
     unreachable_reason: >-
-      No analyzer producing taint-tracking signals has been observed. None of the four
+      Not observable via this scanner. No analyzer producing taint-tracking signals has been observed. None of the four
       key-free analyzers in mcp-scanner 4.8.3 (yara, readiness, vulnerable_package,
       prompt_defense) emits a signal for this axis.
 
@@ -118,7 +118,7 @@ axes:
     signal_status: unreachable_in_v0
     # (ko) HEUR-015 rule_id 가 CLI 출력에서 소실.
     unreachable_reason: >-
-      readiness rule id HEUR-015 is dropped from mcp-scanner 4.8.3 CLI output
+      Not observable via this scanner. readiness rule id HEUR-015 is dropped from mcp-scanner 4.8.3 CLI output
       (report_generator.py:82). The axis is technically scannable, but this
       scanner's CLI emits no signal for it.
 
@@ -128,7 +128,7 @@ axes:
     signal_status: unreachable_in_v0
     # (ko) 빌드·릴리스 파이프라인 신호를 내는 분석기를 아직 확인하지 못했다.
     unreachable_reason: >-
-      No analyzer producing build/release pipeline signals has been observed. None of
+      Not observable via this scanner. No analyzer producing build/release pipeline signals has been observed. None of
       the four key-free analyzers in mcp-scanner 4.8.3 emits a signal for this axis.
 
   # ============================================================
