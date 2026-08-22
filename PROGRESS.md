@@ -72,5 +72,46 @@
 node_modules·문서까지 긁는다). 하네스 갭으로 기록:
 `forge-outputs/11-platform/pipelines/harness-gaps/2026-08-22-wiring-check-common-word-false-positive.md`
 
-- 다음: **Session 3 — Task 16~19**(클레임 매핑 + 커버리지 3칸 렌더, 5 SP).
-  Task 19 render 는 개정안 #01 의 `unreachable_reason` 을 소견서에 출력해야 한다.
+## P5 Session 3 진행상황 — 클레임 매핑 + 커버리지 3칸 렌더 (5 SP)
+
+- [x] Task 16: `src/map.ts` `mapFindingsToClaims` — 축당 정확히 1클레임(항상 15개)
+  ⚠️ **술어를 3종으로 확장**(개정안 #01 §4.4 의 직접 귀결): `scanner_detected` /
+  `scanner_not_detected`(검사했고 못 찾음) / **`scanner_cannot_detect`**(애초에 볼 수 없음
+  + `unreachable_reason`). 뒤의 둘을 뭉치면 "못 본 것"이 "깨끗한 것"으로 읽힌다.
+  Spec FR-03.1 · AC-03j 신설 반영.
+- [x] Task 17: `test/ontology.mutation.test.ts` — 변이 5종(신호 제거 2 · promptdefense 면제 ·
+  taxonomy 우선순위 · signal_status 뒤집기)으로 매핑 검사의 판별력 실증
+- [x] Task 18: `src/render.ts` fail-closed — 15축 누락 / 메타 6필드 결손 / **칸 배정 유실**
+  (술어가 늘었는데 filter 를 안 고쳐 축이 조용히 사라지는 것) → RenderError
+- [x] Task 19: `render()` 본체 — 3칸 소견서. **3절을 3a/3b 로 분리**했다:
+  3a = 도구 한계(신호가 안 오는 기술 축, 사유 동반) / 3b = 조직·계약 증적.
+  이 분리가 없으면 partial 5축이 소견서에서 **통째로 사라진다**(실제로 그럴 뻔했다).
+- [x] Task 20: 증적 요청 폼 체크리스트화 — 3b 만 `- [ ]` 체크박스.
+  3a 에는 붙이지 않는다(도구 한계를 "서류 내면 되는 것"으로 오독시키지 않기 위해)
+- [x] **Spec §0 위반 1건 자체 발견·수정**: `unreachable_reason` 5건이 한글이라 영문 소견서에
+  한글이 섞여 나왔다("소견서 본문은 영어로 통일" 위반). 영문화 + 회귀 방지 테스트 2종 추가
+  (한글 혼입 금지 · 사유 구체성 하한)
+
+- **Session 3 완료** (2026-08-22). `npm test` **125/125 GREEN**.
+  실측 fixture 엔드투엔드로 소견서 생성 확인 — 1칸 4축(13/1/2/1건) · 2칸 1축 ·
+  3a 5축(사유 포함) · 3b 5축(체크박스) · Unmapped 0.
+  판별력 실증(역변조): 3a 칸 삭제 + 버킷팅 가드 해제 → 3건 FAIL, 원복 후 복구.
+
+### ⚠️ 배선 현황 — 파이프라인이 아직 이어져 있지 않다
+
+```
+$ for f in src/*.ts; do b=$(basename $f .ts);     [ $(grep -rl "from './$b.js'" src/ | wc -l) -eq 0 ] && echo "$b: importer 0"; done
+discover / map / normalize / render / runner / scanner-envelope / version-check → 전부 0
+$ ls bin/   → 디렉터리 없음 (package.json 의 bin.agenttrust 가 가리키는 파일이 없다)
+```
+
+9개 모듈 중 **7개가 아무 데서도 import 되지 않는다.** `types`·`ontology`·`masking` 만 다른
+모듈이 쓰고 있고, 이들을 하나로 잇는 `src/cli.ts` 와 `bin/agenttrust.js` 는 **Task 25(Session 4)**
+다. 즉 조각은 다 만들어졌고 각각 테스트로 검증됐지만, **`npx agenttrust scan` 은 아직 실행되지
+않는다.** 이것을 "완료"라고 부르지 않는다.
+
+⚠️ `wiring-check.sh` 는 `normalize` 를 190곳으로 보고한다(오탐) — 위 import 그래프가 정본이다.
+하네스 갭 기록: `harness-gaps/2026-08-22-wiring-check-common-word-false-positive.md`
+
+- 다음: **Session 4 — Task 21~29**(판별력 테스트 3종 + `cli.ts` 배선 + 도그푸딩, 4 SP).
+  Task 25 가 파이프라인을 잇는 지점이고, Task 26 도그푸딩에서 실제 스캐너를 처음 붙인다.

@@ -83,46 +83,53 @@ axes:
     coverage: partial
     claim_type: technical_control
     signal_status: unreachable_in_v0
+    # (ko) HEUR-018 rule_id 가 CLI 출력에서 소실 + destructive_capabilities YARA 룰 부재.
+    # ⚠️ 이 필드는 소견서에 그대로 실린다 — Spec §0 에 따라 **영문으로 쓴다**.
     unreachable_reason: >-
-      readiness 분석기 HEUR-018 의 rule_id 가 mcp-scanner 4.8.3 CLI 출력에서 소실되고
-      (report_generator.py:82), 개발계획이 가정한 destructive_capabilities YARA 룰은
-      존재하지 않는다(룰 파일 10개 전수 확인). 축 자체는 스캔 가능한 성격이나
-      이 스캐너 CLI 로는 신호를 받을 수 없다.
+      readiness rule id HEUR-018 is dropped from mcp-scanner 4.8.3 CLI output
+      (report_generator.py:82 serializes only details["threat_type"]), and the
+      assumed destructive_capabilities YARA rule does not exist (all 10 rule files
+      checked). The axis is technically scannable, but this scanner's CLI emits no
+      signal for it.
 
   auth_oauth:
     coverage: partial
     claim_type: technical_control
     signal_status: unreachable_in_v0
+    # (ko) HEUR-019 rule_id 가 CLI 출력에서 소실.
     unreachable_reason: >-
-      readiness 분석기 HEUR-019 의 rule_id 가 mcp-scanner 4.8.3 CLI 출력에서 소실된다
-      (report_generator.py:82). 축 자체는 스캔 가능한 성격이나 이 스캐너 CLI 로는
-      신호를 받을 수 없다.
+      readiness rule id HEUR-019 is dropped from mcp-scanner 4.8.3 CLI output
+      (report_generator.py:82). The axis is technically scannable, but this
+      scanner's CLI emits no signal for it.
 
   data_flow:
     coverage: partial
     claim_type: technical_control
     signal_status: unreachable_in_v0
+    # (ko) taint-tracking 신호를 내는 분석기를 아직 확인하지 못했다.
     unreachable_reason: >-
-      taint-tracking 계열 신호를 내는 분석기를 아직 확인하지 못했다. mcp-scanner 4.8.3 의
-      키 불요 분석기 4종(yara, readiness, vulnerable_package, prompt_defense) 중 이 축에
-      대응하는 신호를 내는 것이 없다.
+      No analyzer producing taint-tracking signals has been observed. None of the four
+      key-free analyzers in mcp-scanner 4.8.3 (yara, readiness, vulnerable_package,
+      prompt_defense) emits a signal for this axis.
 
   logging:
     coverage: partial
     claim_type: technical_control
     signal_status: unreachable_in_v0
+    # (ko) HEUR-015 rule_id 가 CLI 출력에서 소실.
     unreachable_reason: >-
-      readiness 분석기 HEUR-015 의 rule_id 가 mcp-scanner 4.8.3 CLI 출력에서 소실된다
-      (report_generator.py:82). 축 자체는 스캔 가능한 성격이나 이 스캐너 CLI 로는
-      신호를 받을 수 없다.
+      readiness rule id HEUR-015 is dropped from mcp-scanner 4.8.3 CLI output
+      (report_generator.py:82). The axis is technically scannable, but this
+      scanner's CLI emits no signal for it.
 
   sdlc:
     coverage: partial
     claim_type: technical_control
     signal_status: unreachable_in_v0
+    # (ko) 빌드·릴리스 파이프라인 신호를 내는 분석기를 아직 확인하지 못했다.
     unreachable_reason: >-
-      빌드·릴리스 파이프라인 신호를 내는 분석기를 아직 확인하지 못했다. mcp-scanner 4.8.3 의
-      키 불요 분석기 4종 중 이 축에 대응하는 신호를 내는 것이 없다.
+      No analyzer producing build/release pipeline signals has been observed. None of
+      the four key-free analyzers in mcp-scanner 4.8.3 emits a signal for this axis.
 
   # ============================================================
   # not_scannable (5) — 조직·계약 문서 영역(기술 신호의 대상이 아님)
