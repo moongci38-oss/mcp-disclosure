@@ -39,3 +39,14 @@
   6. Prompt Defense 12종 카테고리·`data_flow`/`sdlc`/`accepts_taxonomy`(AITech-N.N)·YARA 실제
      탐지 시 `threat_names` 표기는 이번 실측 대상(무해한 레퍼런스 MCP 서버)으로는 트리거되지 않아
      여전히 미실측이다(§0 전제사항 그대로 유지, 다음 세션 재확인 필요).
+
+- **환경 발견 — bare `node --test`(Node 22.22)는 `dist/test/*.js`뿐 아니라 `test/*.ts` 원본도
+  같이 주워서 실행하다 전부 `ERR_MODULE_NOT_FOUND`로 죽는다.** Node 22.6+의 내장 TypeScript
+  type-stripping이 기본 활성화돼 `.ts` 파일도 테스트 러너 기본 glob에 잡히는데, 우리 소스는
+  NodeNext 컨벤션대로 `.js` 확장자로 import한다(`from './discover.js'`) — 컴파일 전 원본
+  `.ts` 상태에서는 그 `.js` 파일이 실존하지 않아 모듈 해석이 실패한다. **이것은 구현 결함이
+  아니라 Node 테스트러너 자동탐색과 우리 빌드 파이프라인의 상호작용**이다. Spec이 정한 정식
+  검증 명령은 `package.json`의 `"test": "node --test dist/test/**/*.test.js"`(선행 `pretest`가
+  `npm run build` 실행)이며, `npm test`(또는 `npm run build && node --test dist/test/**/*.test.js`)
+  로는 22/22 전부 GREEN이다. 완료 보고의 "3개 명령 실측"에는 브리프가 요청한 bare `node --test`
+  원문 출력(실패 포함)과 `npm test` 출력(GREEN)을 함께 남긴다 — 실패를 숨기지 않되 원인을 밝힌다.
