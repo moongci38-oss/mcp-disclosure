@@ -60,10 +60,17 @@ export type ScannerMeta = {
 };
 
 // --- §5.5 Claim ---
+// 개정안 #01(2026-08-22 승인) 반영 — 술어가 3종이 됐다.
+// **`scanner_not_detected` 와 `scanner_cannot_detect` 는 전혀 다른 말이다:**
+//   not_detected  = 스캐너가 그 축을 **검사했고** 아무것도 못 찾았다
+//   cannot_detect = 스캐너가 그 축을 **애초에 볼 수 없다**(signal_status: unreachable_in_v0)
+// 둘을 한 술어로 뭉치면 "못 본 것"이 "깨끗한 것"으로 읽힌다 — 이 제품이 존재하는 이유가
+// 정확히 그 혼동을 없애는 것이므로(PRD-v2 §1 커버리지 정직성), 타입 단계에서 갈라 둔다.
 export type Claim =
   | { type: 'technical_control'; axis: CoverageAxis;
-      predicate: 'scanner_detected' | 'scanner_not_detected';
-      finding_ids: string[]; }
+      predicate: 'scanner_detected' | 'scanner_not_detected' | 'scanner_cannot_detect';
+      finding_ids: string[];
+      unreachable_reason?: string; }   // predicate가 'scanner_cannot_detect'이면 필수
   | { type: 'operational_practice'; axis: CoverageAxis; evidence_request: string }
   | { type: 'policy_proof';        axis: CoverageAxis; evidence_request: string };
 
