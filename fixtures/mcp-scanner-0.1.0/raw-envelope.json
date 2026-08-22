@@ -1,0 +1,21 @@
+{
+  "server_url": "stdio://local",
+  "requested_analyzers": ["yara", "readiness", "prompt_defense"],
+  "scan_results": [
+    {
+      "target": "srv-a",
+      "analyzer": "yara",
+      "findings": [
+        { "rule": "credential_harvesting", "taxonomy": "AITech-3.2", "severity": "high", "line": 12 },
+        { "rule": "prompt_injection", "taxonomy": "AITech-1.1", "severity": "medium" }
+      ]
+    },
+    {
+      "target": "srv-a",
+      "analyzer": "readiness",
+      "findings": [
+        { "rule": "HEUR-001", "severity": "low" }
+      ]
+    }
+  ]
+}
