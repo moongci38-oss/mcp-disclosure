@@ -54,7 +54,15 @@ test('스캐너가 없어 스캔 0건이면 소견서가 "검사했지만 못 �
   writeFileSync(join(dir, '.mcp.json'), JSON.stringify({
     mcpServers: { demo: { command: 'node', args: ['nonexistent-server.js'] } },
   }));
-  const r = runCli(['scan', '--path', dir]);
+  // ⚠️ PATH 를 직접 통제한다. 종전에는 "이 머신에 mcp-scanner 가 없다"는 우연에 기대고 있어서,
+  //    스캐너를 설치한 머신에서는 전제가 깨져 FAIL 했다(2026-08-22 실제 발생).
+  //    python 은 찾되 mcp-scanner 는 못 찾는 PATH 를 만든다.
+  const shimDir = mkdtempSync(join(tmpdir(), 'agenttrust-shim-'));
+  writeFileSync(join(shimDir, 'python3'), '#!/bin/sh\necho "Python 3.12.0"\n', { mode: 0o755 });
+  // node 자체도 PATH 로 찾으므로 절대경로(process.execPath)로 띄운다.
+  const r = spawnSync(process.execPath, [CLI, 'scan', '--path', dir], {
+    encoding: 'utf8', env: { ...process.env, PATH: shimDir },
+  });
   assert.equal(r.status, 0, `stderr: ${r.stderr}`);
   const md = readFileSync(join(dir, 'agenttrust-findings.md'), 'utf8');
   const parsed = JSON.parse(readFileSync(join(dir, 'agenttrust-findings.json'), 'utf8'));

@@ -63,7 +63,7 @@ test('accepts_taxonomy 항목도 0건이면 노출된다(오타 taxonomy ID 탐�
 
 // --- 실측 fixture 전 구간 통합 (파서 → normalize) ---
 test('실측 봉투 fixture 를 파서에 통과시킨 결과가 정상 분류된다(엔드투엔드)', () => {
-  const envelope = JSON.parse(readFileSync('fixtures/mcp-scanner-0.1.0/raw-envelope-yara-fired.json', 'utf8'));
+  const envelope = JSON.parse(readFileSync('fixtures/mcp-scanner-4.8.3/raw-envelope-yara-fired.json', 'utf8'));
   const { findings } = normalize(parseScannerRawEnvelope(envelope, 'fallback'), AXIS_TABLE, META);
   assert.equal(findings.length, 17);
   const byAxis = findings.reduce<Record<string, number>>((a, f) => {
@@ -77,9 +77,32 @@ test('실측 봉투 fixture 를 파서에 통과시킨 결과가 정상 분류�
 });
 
 test('실측 fixture 에서 신호원 0인 축에는 단 1건도 배정되지 않는다', () => {
-  const envelope = JSON.parse(readFileSync('fixtures/mcp-scanner-0.1.0/raw-envelope-yara-fired.json', 'utf8'));
+  const envelope = JSON.parse(readFileSync('fixtures/mcp-scanner-4.8.3/raw-envelope-yara-fired.json', 'utf8'));
   const { findings } = normalize(parseScannerRawEnvelope(envelope, 'fallback'), AXIS_TABLE, META);
   const unreachable = new Set(Object.entries(AXIS_TABLE)
     .filter(([, v]) => v.signal_status !== 'reachable').map(([k]) => k));
   assert.ok(findings.every(f => !unreachable.has(f.axis as string)));
+});
+
+// 라이브 스캔 회귀(2026-08-22) — 실제 악성 fixture 서버를 스캔한 원본 봉투다.
+// 스캐너 없이도 이 분류가 고정되도록 캡처해 둔다. 특히 sync_profile/yara 가
+// threat_names 2개 + taxonomy 1개인 실사례라, taxonomy 를 빌려 쓰던 버그의 회귀를 막는다.
+test('라이브 악성 fixture — YARA 3종이 각자 맞는 축으로 간다', () => {
+  const envelope = JSON.parse(readFileSync('fixtures/mcp-scanner-4.8.3/raw-envelope-malicious-live.json', 'utf8'));
+  const { findings } = normalize(parseScannerRawEnvelope(envelope, 'fallback'), AXIS_TABLE, META);
+  const yara = findings.filter(f => f.rule.startsWith('yara_analyzer:'));
+  const axisOf = (threat: string) => yara.find(f => f.rule === `yara_analyzer:${threat}`)?.axis;
+
+  assert.equal(axisOf('PROMPT INJECTION'), 'prompt_injection_defense');
+  assert.equal(axisOf('CREDENTIAL HARVESTING'), 'secret_exposure');
+  assert.equal(axisOf('CODE EXECUTION'), 'malicious_pattern');
+  assert.equal(axisOf('DATA EXFILTRATION'), 'malicious_pattern',
+    'taxonomy 를 옆 finding 에서 빌려 쓰면 여기가 secret_exposure 로 새어 "데이터 반출"을 "시크릿 노출"로 보고한다');
+});
+
+test('라이브 악성 fixture — 미분류 0건(온톨로지에 구멍 없음)', () => {
+  const envelope = JSON.parse(readFileSync('fixtures/mcp-scanner-4.8.3/raw-envelope-malicious-live.json', 'utf8'));
+  const { findings } = normalize(parseScannerRawEnvelope(envelope, 'fallback'), AXIS_TABLE, META);
+  assert.equal(findings.filter(f => f.axis === null).length, 0);
+  assert.ok(findings.length >= 40, `라이브 캡처가 비었다(${findings.length}건) — fixture 가 깨졌는지 확인`);
 });

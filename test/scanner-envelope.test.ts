@@ -7,7 +7,7 @@ import { parseScannerRawEnvelope } from '../src/scanner-envelope.js';
 // 교체됐다 — scan_results[]는 "도구 1개당 1개 원소"이고, findings는 배열이 아니라 분석기명을
 // 키로 하는 롤업 요약 객체다(rule/rule_id 필드 없음). 상세 근거는 src/scanner-envelope.ts 상단
 // 주석 참조.
-const FIXTURE = JSON.parse(readFileSync('fixtures/mcp-scanner-0.1.0/raw-envelope.json', 'utf8'));
+const FIXTURE = JSON.parse(readFileSync('fixtures/mcp-scanner-4.8.3/raw-envelope.json', 'utf8'));
 
 test('실측 raw 봉투 fixture → scan_results 내 non-SAFE 분석기 결과 전부 추출(AC-01h, 실측 스키마)', () => {
   // 이 fixture의 2개 tool 항목은 각각 readiness_analyzer만 total_findings>0(HIGH)이고
@@ -48,7 +48,7 @@ test('rule 필드는 원본에 없다 — analyzer명+threat_names로 최선 근
 // fixture 는 실측 발췌본이다: YARA 발화 4건(정적 입력) + 4분석기 조합 1건.
 // 원본: docs/measurements/2026-08-22-signal-space/
 // ============================================================
-const FIRED = JSON.parse(readFileSync('fixtures/mcp-scanner-0.1.0/raw-envelope-yara-fired.json', 'utf8'));
+const FIRED = JSON.parse(readFileSync('fixtures/mcp-scanner-4.8.3/raw-envelope-yara-fired.json', 'utf8'));
 
 test('analyzer 와 threatName 을 따로 싣는다 — assignAxis 가 둘을 분리해서 받는다', () => {
   const out = parseScannerRawEnvelope(FIRED, 'fallback');
@@ -104,4 +104,37 @@ test('taxonomy 가 여러 개라 어느 threat_name 것인지 모르면 비운�
 test('실측 fixture 전체 팬아웃 건수 — yara 4 + readiness 1 + promptdefense 12 = 17', () => {
   const out = parseScannerRawEnvelope(FIRED, 'fallback');
   assert.equal(out.length, 17);
+});
+
+// 라이브 스캔(2026-08-22) 회귀 — threat_name 이 여럿인데 taxonomy 가 1개면 짝을 알 수 없다.
+// 실제 사례: yara 가 한 도구에서 CREDENTIAL HARVESTING + DATA EXFILTRATION 2건에
+// AISubtech-8.2.3 하나만 냈고, 그 하나를 양쪽에 복사한 탓에 DATA EXFILTRATION 이
+// taxonomy 우선순위를 타고 secret_exposure 로 분류됐다(malicious_pattern 이어야 한다).
+test('threat_name 이 여럿이면 taxonomy 1개짜리도 빌려 쓰지 않는다', () => {
+  const envelope = { scan_results: [{
+    tool_name: 'sync_profile',
+    findings: { yara_analyzer: {
+      severity: 'HIGH', total_findings: 2,
+      threat_names: ['CREDENTIAL HARVESTING', 'DATA EXFILTRATION'],
+      mcp_taxonomies: [{ aisubtech: 'AISubtech-8.2.3' }],
+    } },
+  }] };
+  const out = parseScannerRawEnvelope(envelope, 'fallback');
+  assert.equal(out.length, 2);
+  assert.ok(out.every(f => f.taxonomy === undefined),
+    '짝을 모를 때 하나를 빌려 쓰면 그건 추정이지 관측이 아니다');
+});
+
+test('threat_name 이 하나면 taxonomy 를 정상 배정한다(과잉 방어 금지)', () => {
+  const envelope = { scan_results: [{
+    tool_name: 'run_report',
+    findings: { yara_analyzer: {
+      severity: 'HIGH', total_findings: 1,
+      threat_names: ['CODE EXECUTION'],
+      mcp_taxonomies: [{ aisubtech: 'AISubtech-9.1.1' }],
+    } },
+  }] };
+  const out = parseScannerRawEnvelope(envelope, 'fallback');
+  assert.equal(out.length, 1);
+  assert.equal(out[0].taxonomy, 'AISubtech-9.1.1');
 });

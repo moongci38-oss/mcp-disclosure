@@ -45,7 +45,7 @@ mcp-scanner --format raw --analyzers yara,readiness,vulnerable_package \
 Task 8a가 조사 문서 기반 "최선 추정"으로 만든 `parseScannerRawEnvelope()`는 최상위 3개 키
 (`server_url`/`scan_results`/`requested_analyzers`)는 맞았지만, `scan_results[]` **내부 구조를
 잘못 추정**했다. 실측 확인 후 `src/scanner-envelope.ts`를 아래 실제 구조로 재작성했다(상세 근거는
-그 파일 상단 주석 참조, `fixtures/mcp-scanner-0.1.0/raw-envelope.json`은 실제 캡처 발췌본):
+그 파일 상단 주석 참조, `fixtures/mcp-scanner-4.8.3/raw-envelope.json`은 실제 캡처 발췌본):
 
 ```json
 {

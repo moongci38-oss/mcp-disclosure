@@ -85,7 +85,7 @@ test('15축이 소견서 본문에 빠짐없이 등장한다', () => {
 
 // --- 엔드투엔드: 실측 봉투 → 소견서 ---
 test('실측 fixture 전 구간 → 소견서(발견 4축이 1칸에, 나머지가 각 칸에)', () => {
-  const envelope = JSON.parse(readFileSync('fixtures/mcp-scanner-0.1.0/raw-envelope-yara-fired.json', 'utf8'));
+  const envelope = JSON.parse(readFileSync('fixtures/mcp-scanner-4.8.3/raw-envelope-yara-fired.json', 'utf8'));
   const { markdown, json } = reportOf(parseScannerRawEnvelope(envelope, 'fallback'));
   const sec1 = markdown.slice(markdown.indexOf('## 1.'), markdown.indexOf('## 2.'));
   for (const axis of ['prompt_injection_defense', 'secret_exposure', 'malicious_pattern', 'operational_reliability']) {

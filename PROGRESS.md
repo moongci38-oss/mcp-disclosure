@@ -167,5 +167,34 @@ $ ls bin/   → 디렉터리 없음 (package.json 의 bin.agenttrust 가 가리�
   안내 + 스택트레이스 없음 — `PATH=''` 로 실경로 재현) · `AC-02a`(메타 6필드 전부 노출) ·
   `AC-03a`(claim 의 finding_ids 가 전부 실재 ID) · `AC-04b`(미분류 N≥1 실제 개수).
   판별력 확인: `unmappedCount` 고정 0 + python 가드 제거 → 2건 FAIL, 원복 후 158/158.
-- 실행 경로 중 **미검증**: 원격 대상 라이브 스캔 · 정적 JSON/패키지 대상 · `yara`/`vulnerable_package`
-  실발화(현재 crafted fixture 로만 확인)
+### 2차 도그푸딩 + §12 ⑥ 종결 (2026-08-22, Spec 감사 후속)
+
+- [x] **Spec §12 ⑥ 종결** — `supportedScannerRange: "0.x"` → `testedScannerVersions: ["4.8.3"]`.
+  구 구현은 **우리가 전부 검증한 유일한 버전(4.8.3)을 "지원 범위 밖"이라고 경고**하고 있었다.
+  범위(`4.x`)로 넓히지 않은 이유: 실측 버전이 하나뿐이라 근거가 없다 — 근거 없이 넓히는 것도
+  거짓말이다. fixture 디렉터리도 `mcp-scanner-0.1.0/` → `mcp-scanner-4.8.3/` 개명.
+  선언(package.json)과 코드 상수의 일치를 테스트로 고정했다.
+- [x] **YARA 라이브 발화 검증** — `fixtures/servers/malicious-stdio-server.js` 신설
+  (의존성 0 Node stdio MCP 서버. Cisco 예제는 python `fastmcp` 부재로 사용 불가).
+  실제 CLI 로 스캔 → findings 40 · 미분류 0 · YARA 3종 발화. **taxonomy 매칭 경로가 실행
+  경로에서 처음 검증됐다.**
+
+| # | 등급 | 내용 | 조치 |
+|--:|---|---|---|
+| ⑤ | **높음** | yara 롤업이 threat_names 2개에 taxonomy 1개를 내는데, 파서가 그 하나를 **양쪽에 복사**했다. taxonomy 우선순위 탓에 `DATA EXFILTRATION` 이 `malicious_pattern` 아닌 **`secret_exposure`** 로 분류 — 소견서가 "데이터 반출"을 "시크릿 노출"로 잘못 말했다 | `resolveTaxonomy` 조건을 둘로(taxonomy 1개 **AND** threat_name 1개 이하). 라이브 캡처 fixture 로 회귀 고정 |
+| ⑥ | 중간 | "스캔 0건" 회귀 테스트가 **"이 머신에 스캐너가 없다"는 우연**에 기대고 있어, 스캐너 설치 머신에서 FAIL | PATH 직접 통제(python 셰임만 있는 임시 디렉터리 + `process.execPath`). 스캐너 유/무 양쪽에서 GREEN 확인 |
+
+⑤는 **등급이 아니라 종류가 틀린 오분류**라 읽는 쪽이 엉뚱한 곳을 조사하게 된다. 1차 도그푸딩의
+①과 마찬가지로 **fixture 로는 절대 안 잡혔을 버그**다 — 실제 스캐너가 threat_names 와
+mcp_taxonomies 개수를 다르게 내는 조합은 우리가 상상해서 만들 수 있는 입력이 아니었다.
+
+- **현재**: `npm test` **164/164 GREEN** (스캐너 유/무 양쪽 확인)
+
+### 남은 미검증 / 미결
+
+- **원격 대상 라이브 스캔** — 실제 원격 MCP 엔드포인트가 필요해 미실행(스파이 E2E 로만 검증)
+- **정적 JSON/패키지 대상** — 스캐너는 `static --tools` 를 지원하나 우리 `buildScannerArgs` 는
+  `config`/`remote` 두 형태만 만든다. v0 범위 확장 여부는 미결정
+- **`vulnerable_package` 실발화** — 취약 의존성을 가진 대상 미확보
+- **YARA `INJECTION ATTACK`·`TOOL POISONING` 의 taxonomy** — 발화 대상 미확보
+- **Spec §12 ①** npm 배포명 — Human 승인 게이트(AI 결정 불가)

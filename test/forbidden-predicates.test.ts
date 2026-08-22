@@ -66,7 +66,7 @@ test('발견 0건 소견서에도 금지 술어가 없다(가장 유혹이 큰 �
 
 // 실측 데이터 경로에서도 확인한다 — 스캐너가 준 문자열이 그대로 실려 금지어를 들여올 수 있다.
 test('실측 fixture 경로에서도 금지 술어 0건(스캐너 문자열 유입 차단)', () => {
-  const envelope = JSON.parse(readFileSync('fixtures/mcp-scanner-0.1.0/raw-envelope-yara-fired.json', 'utf8'));
+  const envelope = JSON.parse(readFileSync('fixtures/mcp-scanner-4.8.3/raw-envelope-yara-fired.json', 'utf8'));
   const { markdown, json } = outputs(parseScannerRawEnvelope(envelope, 'fallback'));
   for (const word of ONTOLOGY.forbidden_predicates as string[]) {
     assert.ok(!markdown.includes(word) && !json.includes(word), `"${word}" 가 스캐너 출력 경유로 유입됐다`);
