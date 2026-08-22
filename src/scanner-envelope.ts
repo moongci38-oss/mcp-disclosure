@@ -24,10 +24,22 @@ export type ScannerRawEnvelope = {
 //   - `rule`/`rule_id` 필드 자체가 **존재하지 않는다**. 개별 finding을 식별할 안정적인 rule
 //     식별자가 이 스캐너 버전의 raw 출력에는 없다.
 //
-// 이 사실은 §5.4 ontology.yaml(Session 2, 아직 미작성)의 `rule_map` 설계(`HEUR-001`,
-// `credential_harvesting`, `CVE-*`, `prompt_injection` 등 rule 이름 매칭)가 실제 finding에는
-// **매칭 대상 필드가 없어 항상 미매칭(axis: null)**이 될 수 있다는 뜻이다 — Session 2 착수 전
-// 재검토 필요(IMPL-NOTES.md에 기록, §12 미결 승계).
+// 이 사실은 §5.4 ontology.yaml 의 구 `rule_map` 설계(`HEUR-001`, `credential_harvesting`,
+// `CVE-*`, `prompt_injection` 등 rule 이름 매칭)가 실제 finding 에는 **매칭 대상 필드가 없어
+// 항상 미매칭(axis: null)**이 된다는 뜻이었다.
+//
+// → **해소(개정안 #01, 2026-08-22 승인)**: 키 공간을 `(분석기, threat_name)` + AISubtech
+//   taxonomy 로 교체했다(`ontology.yaml` 작성 완료, `src/ontology.ts` 로더 구현 완료).
+//
+// ⚠️ **이 파일에 남은 후속 작업 2건**(Spec §12 미결 ⑤ — Task 12/15 착수 전 필수):
+//   ①`RawFinding` 이 `analyzer`·`threatName` 을 **따로** 가져야 한다. 아래 구현은 두 값을
+//     `rule` 문자열 하나로 합치는데(`"readiness_analyzer:unknown"`), 새 `assignAxis` 는
+//     둘을 분리해서 받는다.
+//   ②**실측 버그**: `taxonomy` 에 `summary.mcp_taxonomies[0]` 을 그대로 넣는데, 그 원소는
+//     문자열이 아니라 `{aitech, aisubtech, ...}` **객체**다(아래 `RawAnalyzerSummary` 의
+//     `mcp_taxonomies?: string[]` 선언 자체가 틀렸다). `aisubtech` 문자열만 뽑아야 한다.
+//     Session 1 실측에서는 taxonomy 가 항상 빈 배열이라 드러나지 않았던 잠복 버그다 —
+//     YARA 발화·prompt_defense 실측(개정안 #01 §2.3)에서 객체임이 확인됐다.
 export type RawScanResultEntry = {
   status?: string;
   is_safe?: boolean;

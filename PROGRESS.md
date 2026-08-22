@@ -20,3 +20,24 @@
 - **Session 1 완료** (2026-08-22). 총 11개 커밋(Task 1~8b, IMPL-NOTES 발견 기록 1건 추가).
   `npm test` 22/22 GREEN. bare `node --test`는 Node 22의 TS 자동탐색 이슈로 8건 실패(원인은
   구현 결함이 아님 — IMPL-NOTES.md 참조), `npm test`(Spec 정의 검증 경로)로는 전건 GREEN.
+
+## P5 Session 2 진행상황
+
+- 착수: 2026-08-22
+- 범위: Spec §8.5 Task 9 ~ (Session 2, 6 SP) — **단, 착수 전 Spec 개정 게이트를 먼저 통과했다**
+
+- [x] **Spec 개정안 #01** — `rule_map` → `signal_map` 재설계. Session 2 착수 전 mcp-scanner
+  4.8.3 재측정으로 Session 1 진단을 정정했다(rule 식별자는 실존하나 CLI 가 직렬화에서 버린다).
+  부수 수확 2건: `prompt_defense` 분석기가 키 없이 동작(12종 정확 문자열) · `mcp_taxonomies`
+  는 "항상 빈 배열"이 아님(YARA 발화·promptdefense 는 AISubtech 반환).
+  Human 승인 → Spec 본문 반영. commit 594953b(개정안) · 36fe3e7(Spec 반영 + Task 6)
+- [x] Task 6 수정: `LOCAL_SAFE_ANALYZERS` 에 `prompt_defense` 추가 — commit 36fe3e7 (23/23)
+- [x] Task 9: `ontology.yaml` v1 — 15축, signal_map/signal_status/unreachable_reason
+- [x] Task 10: `src/ontology.ts` — `loadAxisTable` fail-closed(누락축·값불량·중복신호·
+  사유누락·신호없는 reachable·coverage×signal_status 교차) — **전체 42/42 GREEN**
+  판별력 실증: 검증 2종을 임시 제거하니 5건 FAIL → 원복 후 42/42 복구(잔재 grep 0건)
+  ⚠️ **배선: 0곳** (재현: `wiring-check.sh loadAxisTable`) — 소비처(`cli.ts`)는 Task 25 다.
+  만들었지만 아직 아무도 부르지 않는다.
+
+- 다음: Task 11~12(normalize 1/3·2/3) — **착수 전 Spec §12 미결 ⑤ 선처리 필수**
+  (`RawFinding` 에 `analyzer`/`threatName` 분리 + `mcp_taxonomies` 객체 파싱 버그)
