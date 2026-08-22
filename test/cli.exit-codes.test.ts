@@ -87,3 +87,29 @@ test('설정 0건일 때 bin 경유도 exit 1(문서와 실제가 일치)', () =
   const r = spawnSync('node', ['bin/agenttrust.js', 'scan', '--path', dir], { encoding: 'utf8' });
   assert.equal(r.status, 1);
 });
+
+// AC-01a — 소견서에 설정 파일 원문이 실려서는 안 된다(FR-01a). target 은 이름이지 내용이 아니다.
+test('AC-01a — Finding.target 에 설정 원본 문자열이 섞이지 않는다', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'agenttrust-noraw-'));
+  writeFileSync(join(dir, '.mcp.json'), JSON.stringify({
+    mcpServers: { demo: { command: 'node', args: ['x.js'], env: { SECRET_LOOKING: 'value' } } },
+  }));
+  runCli(['scan', '--path', dir]);
+  const parsed = JSON.parse(readFileSync(join(dir, 'agenttrust-findings.json'), 'utf8'));
+  for (const f of parsed.findings) {
+    assert.ok(!f.target.includes('{'), `target 에 JSON 원문이 섞였다: ${f.target}`);
+    assert.ok(!f.target.includes('SECRET_LOOKING'), 'target 에 설정 내용이 섞였다');
+  }
+});
+
+// AC-01g — Python 이 없을 때 안내 1줄 + exit 1. 스택트레이스를 뱉으면 사용자는 버그로 읽는다.
+// PATH 를 비워 python3/python 을 못 찾게 만든다(주입 없이 실경로로 재현).
+test('AC-01g — Python 미가용 → 설치 안내 + exit 1, 스택트레이스 없음', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'agenttrust-nopy-'));
+  const r = spawnSync(process.execPath, [CLI, 'scan', '--path', dir], {
+    encoding: 'utf8', env: { ...process.env, PATH: '' },
+  });
+  assert.equal(r.status, 1);
+  assert.match(r.stderr, /Python not found/);
+  assert.ok(!/\bat Object\.<anonymous>|\bat \w+ \(/.test(r.stderr), `스택트레이스가 노출됐다:\n${r.stderr}`);
+});

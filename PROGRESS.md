@@ -146,8 +146,26 @@ $ ls bin/   → 디렉터리 없음 (package.json 의 bin.agenttrust 가 가리�
 
 ### 남은 것
 
-- **Task 28~29 미착수** — Spec §8.5 의 Session 4 목록에 27번까지만 정의돼 있다(29 태스크 총계와
-  불일치). 다음 세션에서 Spec 태스크 번호 정합성을 먼저 확인할 것.
-- Spec §12 미결: ⑤(해소됨) · ⑥ fixture 디렉터리명/`supportedScannerRange` 정리 · ①npm 배포명
+- ~~**Task 28~29 미착수**~~ — **오독이었다(2026-08-22 정정).** Spec 의 "29 태스크"는
+  **번호 1~27 + `8a` + `8b`** 를 센 것이다(Session 1 이 codex 반영으로 2개 신설).
+  누락된 태스크는 없고 **Task 1~27 전량 완료**다.
+  재현: `grep -cE '^\*\*Task [0-9]+[a-z]?:' docs/planning/SPEC-v0-cli.md` → `29`
+- Spec §12 미결: ⑤(종결) · ⑥ fixture 디렉터리명/`supportedScannerRange` 정리 · ①npm 배포명
+
+### Spec 감사 결과 (2026-08-22, Session 4 후속)
+
+**Spec 자체는 정합했다** — 태스크 번호·SP(9+6+5+4=24)·§4.2 exit code 표 모두 코드와 일치.
+대신 **반대 방향 드리프트**가 있었다: 도그푸딩 수정분이 코드에만 있고 Spec 에는 없었다.
+§8.5 스니펫을 다음 세션이 그대로 복사하면 방금 고친 버그를 되살린다.
+
+- **조치**: `§8.6 구현 확정 사항` 신설 — §8.5 계획과 출하 코드가 다른 **12개 지점**을 이유와 함께
+  표로 기록. §8.5 헤더에 "착수 시점 계획, 정본은 §8.6 과 src/" 경고 삽입.
+- **AC 정정 1건**: `AC-05a`("md/json finding 행 수 일치")는 1절 축약 이후 **성립 불가**였다 →
+  "markdown 표기 건수 합 == json 분류 findings 수"로 재정의.
+- **AC 신설 2건**: `AC-02e`(자리표시자 메타 거부) · `AC-03k`(스캔 성사 0건 → cannot_detect).
+- **미검증 AC 5건 보강**: `AC-01a`(target 에 설정 원문 미포함) · `AC-01g`(Python 미가용 시
+  안내 + 스택트레이스 없음 — `PATH=''` 로 실경로 재현) · `AC-02a`(메타 6필드 전부 노출) ·
+  `AC-03a`(claim 의 finding_ids 가 전부 실재 ID) · `AC-04b`(미분류 N≥1 실제 개수).
+  판별력 확인: `unmappedCount` 고정 0 + python 가드 제거 → 2건 FAIL, 원복 후 158/158.
 - 실행 경로 중 **미검증**: 원격 대상 라이브 스캔 · 정적 JSON/패키지 대상 · `yara`/`vulnerable_package`
   실발화(현재 crafted fixture 로만 확인)

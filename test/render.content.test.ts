@@ -145,3 +145,54 @@ test('5건 이하면 생략 표기 없이 전부 보여준다', () => {
   assert.ok(line.includes('3 finding(s)'));
   assert.ok(!line.includes('more'), '3건뿐인데 "더 있음"이라고 하면 안 된다');
 });
+
+// AC-02a — 재현 메타 6필드가 전부 소견서에 보여야 재현 주장이 성립한다.
+test('AC-02a — self-attested 표기 + 메타 6필드 전부 markdown 에 존재', () => {
+  const md = reportOf().markdown;
+  assert.ok(md.includes('self-attested'));
+  for (const v of Object.values(META)) {
+    assert.ok(md.includes(v), `메타 값 "${v}" 이 소견서에 없다`);
+  }
+});
+
+// AC-03a — 기술통제 클레임이 참조하는 ID 는 전부 실재해야 한다(허수 참조 금지, LLM 경유 0회).
+test('AC-03a — 모든 technical_control finding_ids 가 실재 Finding.id 를 가리킨다', () => {
+  const raw = Array.from({ length: 4 }, (_, i) => ({
+    analyzer: 'yara_analyzer', threatName: 'CODE EXECUTION',
+    rule: 'yara_analyzer:CODE EXECUTION', target: `srv-${i}`, raw: { i },
+  }));
+  const { json } = reportOf(raw);
+  const parsed = JSON.parse(json);
+  const known = new Set(parsed.findings.map((f: any) => f.id));
+  const referenced = parsed.claims.filter((c: any) => c.type === 'technical_control').flatMap((c: any) => c.finding_ids);
+  assert.ok(referenced.length > 0);
+  for (const id of referenced) assert.ok(known.has(id), `실재하지 않는 finding id 참조: ${id}`);
+});
+
+// AC-04b — 미분류가 있으면 그 숫자가 보여야 한다. 0 만 확인하면 "항상 0" 버그를 못 잡는다.
+test('AC-04b — 미분류 finding 이 있으면 실제 개수가 노출된다', () => {
+  const raw = [
+    { analyzer: 'unknown_analyzer', threatName: 'NOPE', rule: 'a', target: 's1', raw: {} },
+    { analyzer: 'another_unknown', threatName: 'NOPE2', rule: 'b', target: 's2', raw: {} },
+  ];
+  const { markdown, json } = reportOf(raw);
+  const actual = JSON.parse(json).findings.filter((f: any) => f.axis === null).length;
+  assert.equal(actual, 2);
+  assert.ok(markdown.includes(`Unmapped findings: ${actual}`), '미분류 건수가 실제와 달라졌다');
+});
+
+// AC-05a — markdown 이 건수를 축약 표기하게 됐으므로(Task 26), "행 수 일치"가 아니라
+// "표기된 건수 합 == json findings 수"로 대조한다.
+test('AC-05a — markdown 에 표기된 건수 합이 json findings 수와 일치한다', () => {
+  const raw = Array.from({ length: 12 }, (_, i) => ({
+    analyzer: i % 2 === 0 ? 'yara_analyzer' : 'readiness_analyzer',
+    threatName: i % 2 === 0 ? 'CODE EXECUTION' : 'unknown',
+    rule: `r${i}`, target: `srv-${i}`, raw: { i },
+  }));
+  const { markdown, json } = reportOf(raw);
+  const counted = [...markdown.matchAll(/(\d+) finding\(s\)/g)].reduce((a, m) => a + Number(m[1]), 0);
+  const parsed = JSON.parse(json);
+  const classified = parsed.findings.filter((f: any) => f.axis !== null).length;
+  assert.equal(counted, classified, 'markdown 표기 건수와 json 이 어긋난다');
+  assert.equal(parsed.findings.length, 12);
+});
