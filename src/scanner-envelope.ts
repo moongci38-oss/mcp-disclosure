@@ -53,38 +53,85 @@ export type RawScanResultEntry = {
   [key: string]: unknown;
 };
 
+// mcp_taxonomies[] 의 원소는 **문자열이 아니라 객체**다. 구 선언(`string[]`)은 틀렸고,
+// 그 탓에 `taxonomy` 문자열 필드에 객체가 대입되는 잠복 버그가 있었다 — Session 1 실측에서는
+// 이 배열이 항상 비어 있어서(readiness 만 관측) 드러나지 않았다. 개정안 #01 §2.3 에서
+// YARA 를 실제로 발화시켜 객체 구조를 확인했다.
+export type RawMcpTaxonomy = {
+  scanner_category?: string;
+  aitech?: string;        // 예: "AITech-8.2" — 상위 ID(축 충돌 유발, 매칭에 쓰지 않는다)
+  aitech_name?: string;
+  aisubtech?: string;     // 예: "AISubtech-8.2.3" — 이것만 매칭 키로 쓴다(§5.3)
+  aisubtech_name?: string;
+  description?: string;
+  [key: string]: unknown;
+};
+
 export type RawAnalyzerSummary = {
   severity?: string;           // "SAFE" | "HIGH" | ... (대문자, §0 전제사항 소문자 Severity와 별개)
   threat_names?: string[];
   threat_summary?: string;
   total_findings?: number;
-  mcp_taxonomies?: string[];   // readiness_analyzer에서만 관측(현재까지는 항상 빈 배열)
+  mcp_taxonomies?: RawMcpTaxonomy[];
   [key: string]: unknown;
 };
+
+/**
+ * 스캐너가 이번 스캔에서 이 분석기에 대해 낸 taxonomy 를 정한다.
+ *
+ * ⚠️ **짝을 모르면 비운다 — 추정하지 않는다.** 롤업은 `threat_names` 와 `mcp_taxonomies` 를
+ * 각각 중복 제거해 나열할 뿐, 둘 사이의 대응관계를 남기지 않는다. 실측 예: promptdefense 는
+ * threat_names 12개에 taxonomies 6개다(개정안 #01 §2.2) — 어느 것이 어느 것의 짝인지 알 수
+ * 없다. 원소가 정확히 1개일 때만 명확하므로 그때만 채우고, 나머지는 `raw` 에 전량 보존한다.
+ * 이 제품은 못 보는 것을 본 것처럼 쓰지 않는다.
+ */
+function resolveTaxonomy(taxonomies: RawMcpTaxonomy[] | undefined): string | undefined {
+  if (!Array.isArray(taxonomies) || taxonomies.length !== 1) return undefined;
+  const sub = taxonomies[0]?.aisubtech;
+  return typeof sub === 'string' && sub.length > 0 ? sub : undefined;
+}
 
 export function parseScannerRawEnvelope(raw: unknown, fallbackTarget: string): RawFinding[] {
   const envelope = raw as ScannerRawEnvelope;
   const scanResults = Array.isArray(envelope?.scan_results) ? envelope.scan_results : [];
   const out: RawFinding[] = [];
+
   for (const entry of scanResults) {
     const findingsByAnalyzer = entry.findings && typeof entry.findings === 'object' ? entry.findings : {};
     const target = (entry.tool_name ?? entry.resource_name ?? entry.prompt_name ?? entry.server_name ?? fallbackTarget) as string;
-    for (const [analyzerKey, summary] of Object.entries(findingsByAnalyzer)) {
+
+    for (const [analyzer, summary] of Object.entries(findingsByAnalyzer)) {
       const totalFindings = typeof summary?.total_findings === 'number' ? summary.total_findings : 0;
-      if (totalFindings <= 0) continue; // "SAFE"(0건)는 finding이 아니다 — 조용히 건너뛴다
+      // "SAFE"(0건)는 finding 이 아니다. 요청 이름으로 만들어지는 유령 키
+      // (prompt_defense_analyzer — 항상 0건)도 여기서 함께 걸러진다.
+      if (totalFindings <= 0) continue;
+
       const threatNames = Array.isArray(summary.threat_names) ? summary.threat_names : [];
-      // rule 필드가 원본에 없으므로(위 주석 참조) analyzer명+threat_names로 최선 근사 식별자를 만든다.
-      const rule = threatNames.length > 0 ? `${analyzerKey}:${threatNames.join('+')}` : analyzerKey;
-      const taxonomy = Array.isArray(summary.mcp_taxonomies) && summary.mcp_taxonomies.length > 0
-        ? summary.mcp_taxonomies[0]
-        : undefined;
-      out.push({
-        rule,
-        target,
-        taxonomy,
-        severity: typeof summary.severity === 'string' ? summary.severity : undefined,
-        raw: { ...summary, analyzer: analyzerKey, tool_name: entry.tool_name, item_type: entry.item_type, server_name: entry.server_name },
-      });
+      const taxonomy = resolveTaxonomy(summary.mcp_taxonomies);
+      const severity = typeof summary.severity === 'string' ? summary.severity : undefined;
+      const rawPayload = {
+        ...summary,
+        analyzer,
+        tool_name: entry.tool_name,
+        item_type: entry.item_type,
+        server_name: entry.server_name,
+      };
+
+      // threat_name 단위로 펼친다 — 축 분류가 (분석기, threat_name) 쌍을 키로 쓰기 때문이다.
+      // 12종을 1건으로 뭉치면 그중 어느 축으로 갈지 정할 수 없다.
+      // threat_names 가 비어 있어도(readiness 등) 신호 자체는 버리지 않고 1건 남긴다.
+      const names: (string | undefined)[] = threatNames.length > 0 ? [...new Set(threatNames)] : [undefined];
+      for (const threatName of names) {
+        out.push({
+          analyzer,
+          threatName,
+          rule: threatName === undefined ? analyzer : `${analyzer}:${threatName}`,
+          target,
+          taxonomy,
+          severity,
+          raw: rawPayload,
+        });
+      }
     }
   }
   return out;

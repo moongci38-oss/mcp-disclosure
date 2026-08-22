@@ -21,7 +21,20 @@ export type RedactedRaw = { redacted: true; fields: Record<string, string | numb
 // 아래 1개는 원래 normalize.ts에 있었으나, scanner-envelope.ts(Task 8a, Session 1)가 normalize.ts
 // (Task 11, 마찬가지로 Session 1이지만 시간상 더 뒤)보다 먼저 이 타입을 필요로 해서(A-1 codex 반영
 // 파생 문제) 이 파일로 옮겼다. normalize.ts는 import한 뒤 재노출만 한다(§8.5 Task 11 참조)
-export type RawFinding = { rule: string; target: string; line?: number; taxonomy?: string; severity?: string; raw: Record<string, unknown> };
+// 개정안 #01(2026-08-22 승인) 반영: `analyzer`·`threatName` 을 **따로** 싣는다.
+// 축 분류(assignAxis)가 (분석기, threat_name) 쌍을 키로 쓰기 때문이다 — 구 설계는 둘을
+// `rule` 문자열 하나로 합쳐 놔서(`"readiness_analyzer:unknown"`) 분해가 불가능했다.
+// `rule` 은 사람이 읽는 합성 식별자로 유지한다(안정 ID 계산·소견서 표기에 쓰인다).
+export type RawFinding = {
+  analyzer: string;      // 스캐너 출력의 분석기 키 그대로(예: 'yara_analyzer')
+  threatName?: string;   // threat_names 원소 1개. 비어 있을 수 있다(readiness 등)
+  rule: string;          // `${analyzer}:${threatName}` 또는 threatName 부재 시 `${analyzer}`
+  target: string;
+  line?: number;
+  taxonomy?: string;     // AISubtech-N.N.N 문자열 — 짝을 알 수 없으면 undefined(추정 금지)
+  severity?: string;
+  raw: Record<string, unknown>;
+};
 
 export type Finding = {
   id: string;                 // 안정 ID — §5.1a

@@ -42,3 +42,66 @@ test('rule 필드는 원본에 없다 — analyzer명+threat_names로 최선 근
   const result = parseScannerRawEnvelope(synthetic, 'fallback');
   assert.equal(result[0].rule, 'readiness_analyzer', 'threat_names가 비어 있으면 analyzer명 단독을 rule로 쓴다');
 });
+
+// ============================================================
+// 개정안 #01 파생 (Spec §12 미결 ⑤) — analyzer/threatName 분리 · 팬아웃 · taxonomy 객체 파싱
+// fixture 는 실측 발췌본이다: YARA 발화 4건(정적 입력) + 4분석기 조합 1건.
+// 원본: docs/measurements/2026-08-22-signal-space/
+// ============================================================
+const FIRED = JSON.parse(readFileSync('fixtures/mcp-scanner-0.1.0/raw-envelope-yara-fired.json', 'utf8'));
+
+test('analyzer 와 threatName 을 따로 싣는다 — assignAxis 가 둘을 분리해서 받는다', () => {
+  const out = parseScannerRawEnvelope(FIRED, 'fallback');
+  const pi = out.find(f => f.target === 't_pi');
+  assert.ok(pi, 't_pi 항목이 있어야 한다');
+  assert.equal(pi!.analyzer, 'yara_analyzer');
+  assert.equal(pi!.threatName, 'PROMPT INJECTION');
+  assert.equal(pi!.rule, 'yara_analyzer:PROMPT INJECTION', 'rule 은 사람이 읽는 합성 식별자로 유지한다');
+});
+
+test('threat_names N개 → RawFinding N건으로 펼친다(축 분류가 threat_name 단위이므로)', () => {
+  const out = parseScannerRawEnvelope(FIRED, 'fallback');
+  const pd = out.filter(f => f.analyzer === 'promptdefense_analyzer');
+  assert.equal(pd.length, 12, '12종 카테고리가 1건으로 뭉쳐지면 축 분류가 불가능해진다');
+  assert.ok(pd.some(f => f.threatName === 'INSTRUCTION_OVERRIDE'));
+  assert.ok(pd.some(f => f.threatName === 'ABUSE_PREVENTION'));
+  assert.equal(new Set(pd.map(f => f.threatName)).size, 12, '중복 없이 12종이어야 한다');
+});
+
+test('threat_names 가 비어도 total_findings>0 이면 1건은 남긴다(신호를 버리지 않는다)', () => {
+  const synthetic = { scan_results: [{ tool_name: 'x', findings: { readiness_analyzer: { severity: 'HIGH', total_findings: 3, threat_names: [] } } }] };
+  const out = parseScannerRawEnvelope(synthetic, 'fallback');
+  assert.equal(out.length, 1);
+  assert.equal(out[0].analyzer, 'readiness_analyzer');
+  assert.equal(out[0].threatName, undefined);
+  assert.equal(out[0].rule, 'readiness_analyzer');
+});
+
+test('유령 키(prompt_defense_analyzer, 항상 0건)는 finding 으로 나오지 않는다', () => {
+  const out = parseScannerRawEnvelope(FIRED, 'fallback');
+  assert.ok(!out.some(f => f.analyzer === 'prompt_defense_analyzer'),
+    '요청 이름으로 만들어진 빈 자리는 total_findings=0 이라 걸러져야 한다');
+  assert.ok(out.some(f => f.analyzer === 'promptdefense_analyzer'), '실제 finding 키는 남아야 한다');
+});
+
+test('taxonomy 는 객체가 아니라 aisubtech 문자열이어야 한다(Session 1 잠복 버그)', () => {
+  const out = parseScannerRawEnvelope(FIRED, 'fallback');
+  const cred = out.find(f => f.target === 't_cred');
+  assert.equal(typeof cred!.taxonomy, 'string', 'mcp_taxonomies[] 원소는 객체다 — 그대로 넣으면 안 된다');
+  assert.equal(cred!.taxonomy, 'AISubtech-8.2.3');
+  const exec = out.find(f => f.target === 't_exec');
+  assert.equal(exec!.taxonomy, 'AISubtech-9.1.1');
+});
+
+test('taxonomy 가 여러 개라 어느 threat_name 것인지 모르면 비운다(추정하지 않는다)', () => {
+  const out = parseScannerRawEnvelope(FIRED, 'fallback');
+  const pd = out.filter(f => f.analyzer === 'promptdefense_analyzer');
+  assert.ok(pd.every(f => f.taxonomy === undefined),
+    '12 threat_names 에 6 taxonomies — 짝을 알 수 없으므로 비운다(raw 에는 전량 보존)');
+  assert.ok(pd.every(f => Array.isArray((f.raw as any).mcp_taxonomies)), 'raw 에는 원본 목록이 남아야 한다');
+});
+
+test('실측 fixture 전체 팬아웃 건수 — yara 4 + readiness 1 + promptdefense 12 = 17', () => {
+  const out = parseScannerRawEnvelope(FIRED, 'fallback');
+  assert.equal(out.length, 17);
+});
