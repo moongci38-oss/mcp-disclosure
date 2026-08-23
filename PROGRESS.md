@@ -219,6 +219,48 @@ Unexpected error: Cannot find module '.../package/dist/src/cli.js'
 
 - 현재: `npm test` **168/168 GREEN**
 
+## 원격 저장소 + CI 가동 (2026-08-23)
+
+**이 프로젝트가 처음으로 내 머신 밖에서 검증됐다.** 그 전까지의 "168/168 GREEN"은 전부
+한 대의 노트북에서 나 혼자 돌린 결과였다.
+
+- 원격: `https://github.com/moongci38-oss/agenttrust` (**private**) · `main` 추적
+- 첫 push 에서 forge 온보딩 템플릿 워크플로 7개가 발동 → **미적용 템플릿이라
+  `.github/workflow-templates/` 로 격리**(지우지 않음 — 배포·롤백이 필요해지면 손봐서 되돌린다)
+- 이 프로젝트용 `ci.yml` 신설: Node **20·22 매트릭스** · `npm ci` → `npm test` →
+  **실제 tarball 을 만들어 설치하고 설치본 bin 으로 소견서 생성까지** 확인
+
+### 🔴 CI 가 첫 실행에서 바로 잡은 것 — Node 20 에서 테스트가 0건 돌고 있었다
+
+```
+Node 22 ✓  /  Node 20 ✗
+Could not find '.../dist/test/**/*.test.js'
+```
+
+`node --test` 의 `**` glob 지원은 **Node 21+ 부터**다. Node 20 은 그걸 리터럴로 받아
+**테스트를 한 건도 실행하지 않은 채** exit 1 한다. 개발 머신이 Node 22 라 로컬은 계속
+GREEN 이었고, `engines: ">=20"` 이라고 선언해 둔 하한은 **아무도 검증한 적이 없었다.**
+
+교훈은 "glob 을 잘못 썼다"가 아니라 **선언과 검증이 따로 놀았다**는 쪽이다 —
+이 프로젝트가 계속 잡아온 "등록 ≠ 발효"의 또 다른 형태다.
+→ 셸이 확장하는 단일 `*` 로 교체. 문서 3곳(CLAUDE.md·IMPL-NOTES.md·SPEC §8) 동기화.
+
+### 현재 CI 상태 (실측 로그)
+
+| 잡 | 결과 | 테스트 |
+|---|---|---|
+| build + test (Node 20) | ✅ success (24s) | `# tests 168 / # pass 168 / # fail 0` |
+| build + test (Node 22) | ✅ success (20s) | 동일 |
+
+두 버전 모두에서 **설치본 실행 스텝까지 통과**했다 — `npx` 사용자가 겪는 경로가 실제로 검증된다.
+
+⚠️ **Actions 는 한동안 아예 못 돌았다**: 계정 결제/지출한도 문제로 **잡이 시작조차 안 됐다**
+(`The job was not started because recent account payments have failed...`).
+그때 내가 그 실패를 "템플릿이 pnpm/develop 을 전제해서"라고 **근거 없이 단정**했고,
+`badd7ca` 에서 정정했다. 로그를 못 읽었으면 못 읽었다고 적었어야 했다.
+
+⚠️ 참고: **Node 20 은 2026-04-30 LTS 종료(EOL)**. `engines` 하한을 22 로 올릴지는 별도 판단 사항.
+
 ### 남은 미검증 / 미결
 
 - **원격 대상 라이브 스캔** — 실제 원격 MCP 엔드포인트가 필요해 미실행(스파이 E2E 로만 검증)
