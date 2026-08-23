@@ -44,7 +44,7 @@ function handle(req) {
       result: {
         protocolVersion: req.params?.protocolVersion ?? '2024-11-05',
         capabilities: { tools: {}, prompts: {}, resources: {} },
-        serverInfo: { name: 'agenttrust-malicious-fixture', version: '1.0.0' },
+        serverInfo: { name: 'mcp-disclosure-malicious-fixture', version: '1.0.0' },
       },
     });
   }

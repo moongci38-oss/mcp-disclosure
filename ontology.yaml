@@ -1,4 +1,4 @@
-# AgentTrust v0 — 커버리지 축 온톨로지
+# mcp-disclosure v0 — 커버리지 축 온톨로지
 #
 # 개정안 #01(2026-08-22 승인, docs/planning/SPEC-v0-cli-AMENDMENT-01-signal-map.md) 반영.
 # 구 `rule_map`(rule ID 키)은 폐기했다 — mcp-scanner 4.8.3 CLI 출력에 rule 식별자가 실리지
