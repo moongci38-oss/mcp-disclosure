@@ -46,8 +46,8 @@
   NodeNext 컨벤션대로 `.js` 확장자로 import한다(`from './discover.js'`) — 컴파일 전 원본
   `.ts` 상태에서는 그 `.js` 파일이 실존하지 않아 모듈 해석이 실패한다. **이것은 구현 결함이
   아니라 Node 테스트러너 자동탐색과 우리 빌드 파이프라인의 상호작용**이다. Spec이 정한 정식
-  검증 명령은 `package.json`의 `"test": "node --test dist/test/**/*.test.js"`(선행 `pretest`가
-  `npm run build` 실행)이며, `npm test`(또는 `npm run build && node --test dist/test/**/*.test.js`)
+  검증 명령은 `package.json`의 `"test": "node --test dist/test/*.test.js"`(선행 `pretest`가
+  `npm run build` 실행)이며, `npm test`(또는 `npm run build && node --test dist/test/*.test.js`)
   로는 22/22 전부 GREEN이다. 완료 보고의 "3개 명령 실측"에는 브리프가 요청한 bare `node --test`
   원문 출력(실패 포함)과 `npm test` 출력(GREEN)을 함께 남긴다 — 실패를 숨기지 않되 원인을 밝힌다.
 
@@ -82,3 +82,13 @@
      `prompt_defense_analyzer`(항상 0건 유령) / `promptdefense_analyzer`(실제 finding).
      스캐너 쪽 이름 불일치(`report_generator.py:51` vs `:65`)이며, 파서의 `total_findings<=0`
      스킵이 유령을 걸러준다. ontology 의 `signal_map` 은 **반드시 후자**를 키로 써야 한다.
+
+- **CI 가 첫 실행에서 잡은 Node 버전 버그 (2026-08-23)**: `npm test` 스크립트가
+  `node --test dist/test/**/*.test.js` 였는데, **`node --test` 의 `**` glob 지원은 Node 21+ 부터**다.
+  `engines: ">=20"` 이라고 선언해 놓고 **Node 20 에서는 테스트가 한 건도 실행되지 않았다**
+  (`Could not find '.../dist/test/**/*.test.js'` → exit 1).
+  개발 머신이 Node 22 라 로컬에서는 168건이 GREEN 이었고, **원격 CI 를 붙인 첫날 바로 드러났다.**
+  → 셸이 확장하는 단일 `*` 로 교체(`dist/test/*.test.js`). 테스트 파일이 평면 구조라 충분하다.
+  ⚠️ 이 버그의 교훈은 "glob 을 잘못 썼다"가 아니라 **"engines 에 적어 둔 하한을 아무도 검증하지
+  않고 있었다"** 는 쪽이다. CI 매트릭스(20·22)가 그 검증을 맡는다.
+  ⚠️ 참고: Node 20 은 2026-04-30 로 LTS 유지보수가 끝났다(EOL). 계속 지원할지는 별도 판단 사항.
