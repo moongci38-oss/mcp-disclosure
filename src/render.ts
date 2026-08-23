@@ -76,7 +76,7 @@ export function render(
   }
 
   const lines: string[] = [];
-  lines.push('# AgentTrust Findings Report');
+  lines.push('# MCP Disclosure Report');
   lines.push(`**${disclaimers.self_attested}**`);
   lines.push(`Scanner: ${meta.name} ${meta.version} · Ruleset: ${meta.ruleset_hash} · Scanned: ${meta.scanned_at} · Target: ${meta.target_hash} · Python: ${meta.python_version}`);
   lines.push(remoteBanner);

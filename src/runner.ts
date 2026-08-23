@@ -56,9 +56,9 @@ const DEFAULT_DEPS: ScanDeps = { spawn: nodeSpawn };
 //   추정치) — stdout 전체를 문자열로 누적하는 v0 구현(§6.2 "스트리밍 파싱 안 함")의 안전판이다.
 //   [빗나갈 때 영향] 너무 작으면 findings가 많은 정당한 설정이 잘린다. 너무 크면 악성/버그 스캐너
 //   출력이 메모리를 과다 점유한다.
-//   [조정 경로] `AGENTTRUST_MAX_OUTPUT_BYTES` 환경변수(v0는 CLI 플래그 미제공, YAGNI).
+//   [조정 경로] `MCP_DISCLOSURE_MAX_OUTPUT_BYTES` 환경변수(v0는 CLI 플래그 미제공, YAGNI).
 const DEFAULT_TIMEOUT_MS = 120_000;                                              // 120초
-const MAX_OUTPUT_BYTES = Number(process.env.AGENTTRUST_MAX_OUTPUT_BYTES) || 64 * 1024 * 1024; // 64MB(67,108,864바이트)
+const MAX_OUTPUT_BYTES = Number(process.env.MCP_DISCLOSURE_MAX_OUTPUT_BYTES) || 64 * 1024 * 1024; // 64MB(67,108,864바이트)
 const MAX_STDERR_CHARS = 4096; // stderr는 진단용일 뿐 findings 소스가 아니므로 작게 캡
 
 export type ScanOneOpts = {

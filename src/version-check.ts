@@ -18,7 +18,7 @@ export function checkPythonAvailable(): { ok: boolean; version?: string } {
 // 같은 동작을 하는지 알 수 없고, 근거 없이 넓히면 그것도 거짓말이다. 이 제품은 모르는 것을
 // 아는 것처럼 쓰지 않는다. 두 번째 버전을 실측하는 날 목록에 추가한다.
 //
-// package.json 의 `agenttrust.testedScannerVersions` 와 값을 맞춰 둔다 —
+// package.json 의 `mcpDisclosure.testedScannerVersions` 와 값을 맞춰 둔다 —
 // 어긋나면 `version-check.test.ts` 가 FAIL 한다(선언과 코드가 갈라지는 것을 테스트로 막는다).
 export const TESTED_SCANNER_VERSIONS = ['4.8.3'] as const;
 

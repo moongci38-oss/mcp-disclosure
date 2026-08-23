@@ -25,7 +25,7 @@ test('검증하지 않은 버전은 경고한다 — 위/아래 방향 모두', 
 // 실제 동작이 어긋난다.
 test('package.json 의 testedScannerVersions 와 코드 상수가 일치한다', () => {
   const pkg = JSON.parse(readFileSync('package.json', 'utf8'));
-  assert.deepEqual(pkg.agenttrust.testedScannerVersions, [...TESTED_SCANNER_VERSIONS]);
+  assert.deepEqual(pkg.mcpDisclosure.testedScannerVersions, [...TESTED_SCANNER_VERSIONS]);
 });
 
 // 근거 없는 범위 선언을 막는 가드 — 목록이 늘어나려면 그 버전을 실제로 돌려봤어야 한다.

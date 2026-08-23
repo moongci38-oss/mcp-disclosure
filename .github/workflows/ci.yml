@@ -43,10 +43,10 @@ jobs:
           npm pack --pack-destination /tmp
           WORK=$(mktemp -d); cd "$WORK"
           npm init -y >/dev/null
-          npm install /tmp/agenttrust-*.tgz
+          npm install /tmp/mcp-disclosure-*.tgz
           TARGET=$(mktemp -d)
           printf '{"mcpServers":{"demo":{"command":"node","args":["x.js"]}}}' > "$TARGET/.mcp.json"
-          ./node_modules/.bin/agenttrust scan --path "$TARGET"
-          test -f "$TARGET/agenttrust-findings.md"
-          test -f "$TARGET/agenttrust-findings.json"
+          ./node_modules/.bin/mcp-disclosure scan --path "$TARGET"
+          test -f "$TARGET/mcp-disclosure-findings.md"
+          test -f "$TARGET/mcp-disclosure-findings.json"
           echo "설치본 실행 OK"

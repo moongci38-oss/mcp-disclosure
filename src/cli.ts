@@ -15,7 +15,7 @@ import { checkPythonAvailable, getScannerVersion, checkScannerVersion } from './
 
 // ⚠️ ontology.yaml 은 **패키지에 동봉되는 자산**이지 사용자 작업 디렉터리의 파일이 아니다.
 // Spec 초안은 `process.cwd()` 기준으로 읽었는데, 그러면 v0 의 유일한 배포 형태인
-// `npx agenttrust scan`(임의 디렉터리에서 실행)이 첫 줄부터 죽는다 — 스캔 대상 폴더에
+// `npx mcp-disclosure scan`(임의 디렉터리에서 실행)이 첫 줄부터 죽는다 — 스캔 대상 폴더에
 // ontology.yaml 이 있을 이유가 없기 때문이다. 모듈 위치 기준으로 올려 잡는다.
 // dist/src/cli.js → dist/src → dist → <package root>/ontology.yaml
 function ontologyPath(): string {
@@ -116,9 +116,9 @@ export async function main(argv: string[]): Promise<void> {
       { allowRemote, usedRemoteCount: runnerResult.usedRemoteTargets.length },
       ontologyRaw, scannerWarnings,
     );
-    writeFileSync(join(rootDir, 'agenttrust-findings.md'), markdown);
-    writeFileSync(join(rootDir, 'agenttrust-findings.json'), json);
-    process.stdout.write('Report written: agenttrust-findings.md, agenttrust-findings.json\n');
+    writeFileSync(join(rootDir, 'mcp-disclosure-findings.md'), markdown);
+    writeFileSync(join(rootDir, 'mcp-disclosure-findings.json'), json);
+    process.stdout.write('Report written: mcp-disclosure-findings.md, mcp-disclosure-findings.json\n');
     process.exit(0);
   } catch (e) {
     if (e instanceof RenderError) {
@@ -131,7 +131,7 @@ export async function main(argv: string[]): Promise<void> {
 
 // 이 파일을 `node dist/src/cli.js` 로 **직접 실행**했을 때도 동작하게 한다.
 // 없으면 모듈이 로드만 되고 아무 일도 일어나지 않는다(exit 0, 출력 0) — "조용히 성공한 것처럼
-// 보이는 실패"라서 제일 나쁘다. bin/agenttrust.js 경유 실행은 main() 을 직접 부르므로 무관하다.
+// 보이는 실패"라서 제일 나쁘다. bin/mcp-disclosure.js 경유 실행은 main() 을 직접 부르므로 무관하다.
 if (process.argv[1] && fileURLToPath(import.meta.url) === resolve(process.argv[1])) {
   main(process.argv.slice(2)).catch((e: unknown) => {
     process.stderr.write(`Unexpected error: ${e instanceof Error ? e.message : String(e)}\n`);

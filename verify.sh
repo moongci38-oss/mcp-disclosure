@@ -1,5 +1,5 @@
 #!/bin/bash
-# AgentTrust — 로컬 검증 게이트.
+# mcp-disclosure — 로컬 검증 게이트.
 #
 # ⚠️ **이건 CI 의 대용품이지 CI 가 아니다.** 2026-08-22 기준 이 저장소의 GitHub Actions 는
 #    계정 결제 문제로 **잡이 시작조차 되지 않는다**("The job was not started because recent
@@ -24,12 +24,12 @@ WORK=$(mktemp -d)
 (
   cd "$WORK"
   npm init -y >/dev/null 2>&1
-  npm install "$TARBALL_DIR"/agenttrust-*.tgz >/dev/null 2>&1
+  npm install "$TARBALL_DIR"/mcp-disclosure-*.tgz >/dev/null 2>&1
   TARGET=$(mktemp -d)
   printf '{"mcpServers":{"demo":{"command":"node","args":["x.js"]}}}' > "$TARGET/.mcp.json"
-  ./node_modules/.bin/agenttrust scan --path "$TARGET" >/dev/null
-  test -f "$TARGET/agenttrust-findings.md"
-  test -f "$TARGET/agenttrust-findings.json"
+  ./node_modules/.bin/mcp-disclosure scan --path "$TARGET" >/dev/null
+  test -f "$TARGET/mcp-disclosure-findings.md"
+  test -f "$TARGET/mcp-disclosure-findings.json"
 )
 echo "  설치본 실행 OK — 소견서 2종 생성 확인"
 

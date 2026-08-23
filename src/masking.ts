@@ -22,15 +22,15 @@ const URL_CRED_RE = /:\/\/[^/\s:@]+:[^/\s@]+@/;
 //   base64/hex 같은 무작위 토큰은 ~4.5~6.0bits/char 다 — 4.0 을 컷라인으로 삼으면 자연어 오탐이 준다.
 //   [빗나갈 때 영향] 낮추면(3.0) 평범한 식별자 문자열까지 마스킹돼 소견서 가독성이 떨어진다.
 //   올리면(5.0) 약한 무작위성의 토큰(짧은 시크릿)을 놓친다.
-//   [조정 경로] `AGENTTRUST_ENTROPY_BITS` 환경변수(v0 는 CLI 플래그 미제공, YAGNI).
+//   [조정 경로] `MCP_DISCLOSURE_ENTROPY_BITS` 환경변수(v0 는 CLI 플래그 미제공, YAGNI).
 // ENTROPY_MIN_LEN=20: ⚠️ **시크릿은 20자 미만도 흔하다**(8자리 PIN, 짧은 API 키 등) — 이
 //   엔트로피 검사 *단독*으로는 짧은 시크릿을 놓친다. 그것이 이 검사의 유일한 방어선이 아닌
 //   이유다: `KEY_DENYLIST`(위)는 값 길이·엔트로피와 무관하게 항상 마스킹한다 — 짧은 시크릿이
 //   위험 키 이름(matched_string/authorization/token 등)으로 반환되면 여기서 잡힌다. 이
 //   엔트로피 검사는 "임의 필드명으로 새어나온 긴 무작위 문자열"만 보완적으로 잡는 2차 방어선이다.
-//   [조정 경로] `AGENTTRUST_ENTROPY_MIN_LEN` 환경변수.
-const ENTROPY_THRESHOLD_BITS = Number(process.env.AGENTTRUST_ENTROPY_BITS) || 4.0; // bits/char
-const ENTROPY_MIN_LEN = Number(process.env.AGENTTRUST_ENTROPY_MIN_LEN) || 20;
+//   [조정 경로] `MCP_DISCLOSURE_ENTROPY_MIN_LEN` 환경변수.
+const ENTROPY_THRESHOLD_BITS = Number(process.env.MCP_DISCLOSURE_ENTROPY_BITS) || 4.0; // bits/char
+const ENTROPY_MIN_LEN = Number(process.env.MCP_DISCLOSURE_ENTROPY_MIN_LEN) || 20;
 
 function shannonEntropy(s: string): number {
   const freq = new Map<string, number>();

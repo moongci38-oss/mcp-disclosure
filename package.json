@@ -1,10 +1,10 @@
 {
-  "name": "agenttrust",
+  "name": "mcp-disclosure",
   "version": "0.1.0",
-  "description": "Local-only configuration disclosure CLI for AI agent/MCP setups",
+  "description": "Local-only configuration disclosure CLI for AI agent/MCP setups — reports what it found, what it did not find, and what it cannot see",
   "type": "module",
   "bin": {
-    "agenttrust": "./bin/agenttrust.js"
+    "mcp-disclosure": "./bin/mcp-disclosure.js"
   },
   "engines": {
     "node": ">=20"
@@ -24,17 +24,17 @@
     "@types/js-yaml": "^4.0.9"
   },
   "license": "MIT",
-  "agenttrust": {
-    "_comment": "테스트로 실제 검증한 스캐너 버전 목록. '지원 범위'가 아니라 '검증한 버전'이다 — 범위를 선언하려면 여러 버전을 실측해야 하는데 아직 하나뿐이다.",
-    "testedScannerVersions": [
-      "4.8.3"
-    ]
-  },
   "files": [
     "dist/src/",
     "bin/",
     "ontology.yaml",
     "README.md",
     "LICENSE"
-  ]
+  ],
+  "mcpDisclosure": {
+    "_comment": "테스트로 실제 검증한 스캐너 버전 목록. '지원 범위'가 아니라 '검증한 버전'이다 — 범위를 선언하려면 여러 버전을 실측해야 하는데 아직 하나뿐이다.",
+    "testedScannerVersions": [
+      "4.8.3"
+    ]
+  }
 }

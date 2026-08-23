@@ -10,21 +10,21 @@ const CLI = 'dist/src/cli.js';
 const runCli = (args: string[]) => spawnSync('node', [CLI, ...args], { encoding: 'utf8' });
 
 test('설정 파일 0건 디렉토리 → exit 1', () => {
-  const dir = mkdtempSync(join(tmpdir(), 'agenttrust-empty-'));
+  const dir = mkdtempSync(join(tmpdir(), 'mcp-disclosure-empty-'));
   assert.throws(() => execFileSync('node', [CLI, 'scan', '--path', dir], { stdio: 'pipe' }));
 });
 
 test('설정 0건일 때 stderr 에 "어디를 찾았는지"를 알려준다(막다른 에러 금지)', () => {
-  const dir = mkdtempSync(join(tmpdir(), 'agenttrust-empty2-'));
+  const dir = mkdtempSync(join(tmpdir(), 'mcp-disclosure-empty2-'));
   const r = runCli(['scan', '--path', dir]);
   assert.equal(r.status, 1);
   assert.match(r.stderr, /No agent configuration found/);
   assert.match(r.stderr, /\.mcp\.json/, '탐색 경로를 보여줘야 사용자가 다음 행동을 정할 수 있다');
 });
 
-// ontology.yaml 은 패키지 동봉 자산이다 — cwd 와 무관하게 찾아야 `npx agenttrust scan` 이 산다.
+// ontology.yaml 은 패키지 동봉 자산이다 — cwd 와 무관하게 찾아야 `npx mcp-disclosure scan` 이 산다.
 test('임의 디렉토리에서 실행해도 ontology 를 찾는다(cwd 비의존)', () => {
-  const dir = mkdtempSync(join(tmpdir(), 'agenttrust-cwd-'));
+  const dir = mkdtempSync(join(tmpdir(), 'mcp-disclosure-cwd-'));
   const r = spawnSync('node', [join(process.cwd(), CLI), 'scan', '--path', dir], { cwd: dir, encoding: 'utf8' });
   assert.ok(!/Ontology error|ENOENT.*ontology/.test(r.stderr), `ontology 해석 실패: ${r.stderr}`);
   assert.equal(r.status, 1, '설정 0건이므로 exit 1 이어야 한다(ontology 문제가 아니라)');
@@ -32,40 +32,40 @@ test('임의 디렉토리에서 실행해도 ontology 를 찾는다(cwd 비의�
 
 // 실제 대상이 있으면 소견서 2종이 실제로 생성돼야 한다 — 배선의 최종 증거다.
 test('.mcp.json 이 있으면 소견서 md/json 2종을 실제로 쓴다', () => {
-  const dir = mkdtempSync(join(tmpdir(), 'agenttrust-real-'));
+  const dir = mkdtempSync(join(tmpdir(), 'mcp-disclosure-real-'));
   writeFileSync(join(dir, '.mcp.json'), JSON.stringify({
     mcpServers: { demo: { command: 'node', args: ['nonexistent-server.js'] } },
   }));
   const r = runCli(['scan', '--path', dir]);
   assert.equal(r.status, 0, `stderr: ${r.stderr}`);
-  assert.ok(existsSync(join(dir, 'agenttrust-findings.md')));
-  assert.ok(existsSync(join(dir, 'agenttrust-findings.json')));
-  const md = readFileSync(join(dir, 'agenttrust-findings.md'), 'utf8');
-  assert.ok(md.includes('# AgentTrust Findings Report'));
+  assert.ok(existsSync(join(dir, 'mcp-disclosure-findings.md')));
+  assert.ok(existsSync(join(dir, 'mcp-disclosure-findings.json')));
+  const md = readFileSync(join(dir, 'mcp-disclosure-findings.md'), 'utf8');
+  assert.ok(md.includes('# MCP Disclosure Report'));
   assert.ok(md.includes('### 3a.'), '못 보는 축이 실제 산출물에도 나와야 한다');
-  const parsed = JSON.parse(readFileSync(join(dir, 'agenttrust-findings.json'), 'utf8'));
+  const parsed = JSON.parse(readFileSync(join(dir, 'mcp-disclosure-findings.json'), 'utf8'));
   assert.equal(parsed.claims.length, 15, '실제 실행에서도 15축 전수');
 });
 
 // 도그푸딩 Task 26 회귀 — 실행 경로 전체에서 이 거짓 진술이 재발하지 않는지 확인한다.
 // (이 테스트 환경에는 mcp-scanner 가 PATH 에 없으므로 스캔은 실패하는 것이 정상이다.)
 test('스캐너가 없어 스캔 0건이면 소견서가 "검사했지만 못 찾았다"고 말하지 않는다', () => {
-  const dir = mkdtempSync(join(tmpdir(), 'agenttrust-noscan-'));
+  const dir = mkdtempSync(join(tmpdir(), 'mcp-disclosure-noscan-'));
   writeFileSync(join(dir, '.mcp.json'), JSON.stringify({
     mcpServers: { demo: { command: 'node', args: ['nonexistent-server.js'] } },
   }));
   // ⚠️ PATH 를 직접 통제한다. 종전에는 "이 머신에 mcp-scanner 가 없다"는 우연에 기대고 있어서,
   //    스캐너를 설치한 머신에서는 전제가 깨져 FAIL 했다(2026-08-22 실제 발생).
   //    python 은 찾되 mcp-scanner 는 못 찾는 PATH 를 만든다.
-  const shimDir = mkdtempSync(join(tmpdir(), 'agenttrust-shim-'));
+  const shimDir = mkdtempSync(join(tmpdir(), 'mcp-disclosure-shim-'));
   writeFileSync(join(shimDir, 'python3'), '#!/bin/sh\necho "Python 3.12.0"\n', { mode: 0o755 });
   // node 자체도 PATH 로 찾으므로 절대경로(process.execPath)로 띄운다.
   const r = spawnSync(process.execPath, [CLI, 'scan', '--path', dir], {
     encoding: 'utf8', env: { ...process.env, PATH: shimDir },
   });
   assert.equal(r.status, 0, `stderr: ${r.stderr}`);
-  const md = readFileSync(join(dir, 'agenttrust-findings.md'), 'utf8');
-  const parsed = JSON.parse(readFileSync(join(dir, 'agenttrust-findings.json'), 'utf8'));
+  const md = readFileSync(join(dir, 'mcp-disclosure-findings.md'), 'utf8');
+  const parsed = JSON.parse(readFileSync(join(dir, 'mcp-disclosure-findings.json'), 'utf8'));
 
   // 스캔이 실제로 실패했음을 먼저 확인한다(전제가 깨지면 이 테스트는 무의미하다)
   assert.ok(parsed.unscanned.length > 0, '이 환경에서는 스캔이 실패해야 이 테스트가 의미를 갖는다');
@@ -80,30 +80,30 @@ test('스캐너가 없어 스캔 0건이면 소견서가 "검사했지만 못 �
 });
 
 // README 가 약속한 실행 형태가 실제로 되는지 — bin 경유 경로는 cli.js 직접 실행과 다른 코드다.
-test('bin/agenttrust.js 경유로도 동작한다(README 의 npx 경로)', () => {
-  const dir = mkdtempSync(join(tmpdir(), 'agenttrust-bin-'));
+test('bin/mcp-disclosure.js 경유로도 동작한다(README 의 npx 경로)', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'mcp-disclosure-bin-'));
   writeFileSync(join(dir, '.mcp.json'), JSON.stringify({
     mcpServers: { demo: { command: 'node', args: ['nonexistent-server.js'] } },
   }));
-  const r = spawnSync('node', ['bin/agenttrust.js', 'scan', '--path', dir], { encoding: 'utf8' });
+  const r = spawnSync('node', ['bin/mcp-disclosure.js', 'scan', '--path', dir], { encoding: 'utf8' });
   assert.equal(r.status, 0, `stderr: ${r.stderr}`);
-  assert.ok(existsSync(join(dir, 'agenttrust-findings.md')));
+  assert.ok(existsSync(join(dir, 'mcp-disclosure-findings.md')));
 });
 
 test('설정 0건일 때 bin 경유도 exit 1(문서와 실제가 일치)', () => {
-  const dir = mkdtempSync(join(tmpdir(), 'agenttrust-bin-empty-'));
-  const r = spawnSync('node', ['bin/agenttrust.js', 'scan', '--path', dir], { encoding: 'utf8' });
+  const dir = mkdtempSync(join(tmpdir(), 'mcp-disclosure-bin-empty-'));
+  const r = spawnSync('node', ['bin/mcp-disclosure.js', 'scan', '--path', dir], { encoding: 'utf8' });
   assert.equal(r.status, 1);
 });
 
 // AC-01a — 소견서에 설정 파일 원문이 실려서는 안 된다(FR-01a). target 은 이름이지 내용이 아니다.
 test('AC-01a — Finding.target 에 설정 원본 문자열이 섞이지 않는다', () => {
-  const dir = mkdtempSync(join(tmpdir(), 'agenttrust-noraw-'));
+  const dir = mkdtempSync(join(tmpdir(), 'mcp-disclosure-noraw-'));
   writeFileSync(join(dir, '.mcp.json'), JSON.stringify({
     mcpServers: { demo: { command: 'node', args: ['x.js'], env: { SECRET_LOOKING: 'value' } } },
   }));
   runCli(['scan', '--path', dir]);
-  const parsed = JSON.parse(readFileSync(join(dir, 'agenttrust-findings.json'), 'utf8'));
+  const parsed = JSON.parse(readFileSync(join(dir, 'mcp-disclosure-findings.json'), 'utf8'));
   for (const f of parsed.findings) {
     assert.ok(!f.target.includes('{'), `target 에 JSON 원문이 섞였다: ${f.target}`);
     assert.ok(!f.target.includes('SECRET_LOOKING'), 'target 에 설정 내용이 섞였다');
@@ -113,7 +113,7 @@ test('AC-01a — Finding.target 에 설정 원본 문자열이 섞이지 않는�
 // AC-01g — Python 이 없을 때 안내 1줄 + exit 1. 스택트레이스를 뱉으면 사용자는 버그로 읽는다.
 // PATH 를 비워 python3/python 을 못 찾게 만든다(주입 없이 실경로로 재현).
 test('AC-01g — Python 미가용 → 설치 안내 + exit 1, 스택트레이스 없음', () => {
-  const dir = mkdtempSync(join(tmpdir(), 'agenttrust-nopy-'));
+  const dir = mkdtempSync(join(tmpdir(), 'mcp-disclosure-nopy-'));
   const r = spawnSync(process.execPath, [CLI, 'scan', '--path', dir], {
     encoding: 'utf8', env: { ...process.env, PATH: '' },
   });

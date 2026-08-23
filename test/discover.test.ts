@@ -6,14 +6,14 @@ import { join } from 'node:path';
 import { discover } from '../src/discover.js';
 
 test('설정 파일 0건 → targets 0, scannedPaths 4개 이상', () => {
-  const dir = mkdtempSync(join(tmpdir(), 'agenttrust-'));
+  const dir = mkdtempSync(join(tmpdir(), 'mcp-disclosure-'));
   const result = discover(dir);
   assert.equal(result.targets.length, 0);
   assert.ok(result.scannedPaths.length >= 4);
 });
 
 test('.mcp.json의 remote 서버가 transport:remote로 분류됨', () => {
-  const dir = mkdtempSync(join(tmpdir(), 'agenttrust-'));
+  const dir = mkdtempSync(join(tmpdir(), 'mcp-disclosure-'));
   writeFileSync(join(dir, '.mcp.json'), JSON.stringify({
     mcpServers: {
       local: { command: 'node', args: ['server.js'] },

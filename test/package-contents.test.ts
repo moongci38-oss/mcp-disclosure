@@ -1,7 +1,7 @@
 // 배포 산출물 검증 — "내 머신에서 되는 것"과 "설치한 사람에게서 되는 것"은 다르다.
 //
 // ⚠️ 실제로 있었던 버그(2026-08-22): `dist/` 가 .gitignore 에 있어서 npm 이 패키지에서
-//    통째로 뺐다. `bin/agenttrust.js` 는 `../dist/src/cli.js` 를 import 하므로,
+//    통째로 뺐다. `bin/mcp-disclosure.js` 는 `../dist/src/cli.js` 를 import 하므로,
 //    배포했다면 **모든 사용자에게서 첫 줄에 죽었다**:
 //      Cannot find module '.../package/dist/src/cli.js'
 //    로컬 테스트 164건은 전부 GREEN 이었다 — dist 가 로컬에는 있었기 때문이다.
@@ -19,13 +19,13 @@ function packedFiles(): string[] {
 
 test('패키지에 실행에 필요한 것이 전부 들어간다', () => {
   const files = packedFiles();
-  for (const need of ['dist/src/cli.js', 'bin/agenttrust.js', 'ontology.yaml', 'README.md', 'LICENSE']) {
+  for (const need of ['dist/src/cli.js', 'bin/mcp-disclosure.js', 'ontology.yaml', 'README.md', 'LICENSE']) {
     assert.ok(files.includes(need), `배포 패키지에 ${need} 가 없다 — 설치한 사람에게서 실패한다`);
   }
 });
 
 test('bin 이 import 하는 경로가 패키지 안에 실재한다', () => {
-  const bin = readFileSync('bin/agenttrust.js', 'utf8');
+  const bin = readFileSync('bin/mcp-disclosure.js', 'utf8');
   const m = bin.match(/import\(['"]\.\.\/(.+?)['"]\)/);
   assert.ok(m, 'bin 의 동적 import 경로를 못 찾았다 — 이 테스트를 먼저 고쳐라');
   assert.ok(packedFiles().includes(m![1]),

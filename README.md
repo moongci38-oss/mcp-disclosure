@@ -1,12 +1,12 @@
-# AgentTrust
+# mcp-disclosure
 
 **A configuration disclosure CLI for AI agent / MCP setups.**
 
-Most scanners tell you what they found. AgentTrust also tells you **what it looked for and did not
+Most scanners tell you what they found. mcp-disclosure also tells you **what it looked for and did not
 find**, and **what it cannot look at all** — side by side, in one report.
 
 That third column is the point. A clean report from a tool that never checked is worse than no
-report, because it reads as a clean bill of health. AgentTrust names the gaps instead of leaving
+report, because it reads as a clean bill of health. mcp-disclosure names the gaps instead of leaving
 them blank.
 
 ```
@@ -29,22 +29,22 @@ No findings ≠ proof of safety — undetected as of 2026-08-22T08:51:19Z, per c
 ## Usage
 
 ```bash
-npx agenttrust scan                 # scan the current directory
-npx agenttrust scan --path ./repo   # scan a specific directory
-npx agenttrust scan --allow-remote  # opt in to scanning remote MCP endpoints (off by default)
+npx mcp-disclosure scan                 # scan the current directory
+npx mcp-disclosure scan --path ./repo   # scan a specific directory
+npx mcp-disclosure scan --allow-remote  # opt in to scanning remote MCP endpoints (off by default)
 ```
 
 Writes two files next to the scanned directory:
 
-- `agenttrust-findings.md` — the report you read
-- `agenttrust-findings.json` — the same data, complete (the markdown truncates long ID lists)
+- `mcp-disclosure-findings.md` — the report you read
+- `mcp-disclosure-findings.json` — the same data, complete (the markdown truncates long ID lists)
 
 Exit codes: `0` report written · `1` no configuration found / Python missing · `2` ontology or
 render failed closed · `3` unexpected error.
 
 ## No network calls
 
-AgentTrust makes **zero network calls of its own**. No telemetry, no upload, no license check.
+mcp-disclosure makes **zero network calls of its own**. No telemetry, no upload, no license check.
 Everything runs locally and the report never leaves your disk unless you move it.
 
 One deliberate exception, and it is opt-in: `--allow-remote` lets the underlying scanner connect
@@ -61,7 +61,7 @@ report carries a banner saying a remote connection happened.
 pip install cisco-ai-mcp-scanner
 ```
 
-AgentTrust does not install it for you and does not try to. If the scanner is missing, the run
+mcp-disclosure does not install it for you and does not try to. If the scanner is missing, the run
 still produces a report — one that says every technical axis was **not evaluated**, with the
 reason. It will not tell you things look fine.
 
