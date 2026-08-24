@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import { EventEmitter } from 'node:events';
 // ⚠️ `SpawnFn` 을 함께 import 한다 — 빠지면 `Cannot find name 'SpawnFn'` 로 빌드가 깨진다.
 //    `node:child_process` 는 import 하지 않는다: 주입 방식이라 mock 대상이 없다.
-import { runScanner, type SpawnFn } from '../src/runner.js';
+import { runScanner, SCANNER_PASSES, type SpawnFn } from '../src/runner.js';
 import type { ScanTarget } from '../src/types.js';
 
 // ⚠️ **스파이는 mock 라이브러리가 아니라 주입으로 만든다**(codex 2회차 High).
@@ -45,12 +45,18 @@ test('E2E — remote target(allowRemote:false) → spawn 자체가 호출되지 
   assert.equal(result.unscanned[0].target.name, 'remote-srv');
 });
 
-test('E2E — --allow-remote 시엔 spawn 이 정확히 1회 호출되고 argv 에 URL 포함', async () => {
+// ⚠️ 2026-08-24: 기대 호출 수를 상수 1 이 아니라 `SCANNER_PASSES.length` 에 연동한다.
+//    분리 실행 도입으로 대상 하나가 **pass 수만큼** spawn 된다(상류 버그 회피 — runner.ts 주석).
+//    숫자를 박아두면 pass 구성이 바뀔 때마다 이 테스트가 "기능이 깨졌다"고 거짓 신호를 낸다.
+//    검사의 본뜻은 "몇 번 부르나"가 아니라 **"차단됐는데도 불렸나 / 허용됐는데 안 불렸나"** 다.
+test('E2E — --allow-remote 시엔 pass 수만큼 spawn 되고 argv 에 URL 포함', async () => {
   const spy = makeSpawnSpy();
   const result = await runScanner([remoteTarget], { allowRemote: true }, { spawn: spy.spawn });
 
-  assert.equal(spy.calls.length, 1, '--allow-remote 면 spawn 이 정확히 1회 호출돼야 한다');
-  assert.ok(spy.calls[0].join(' ').includes('example.internal'), 'allow-remote 시 argv 에 URL 이 있어야 한다');
+  assert.equal(spy.calls.length, SCANNER_PASSES.length, '--allow-remote 면 대상당 pass 수만큼 spawn 돼야 한다');
+  for (const call of spy.calls) {
+    assert.ok(call.join(' ').includes('example.internal'), 'allow-remote 시 모든 pass 의 argv 에 URL 이 있어야 한다');
+  }
   assert.equal(result.unscanned.length, 0);
 });
 
@@ -59,10 +65,13 @@ test('E2E — local+remote 혼합(allowRemote:false) → local 만 스캔되고 
   const spy = makeSpawnSpy();
   const result = await runScanner([localTarget, remoteTarget], { allowRemote: false }, { spawn: spy.spawn });
 
-  assert.equal(spy.calls.length, 1, 'local 1건만 spawn 돼야 한다');
-  const argv = spy.calls[0].join(' ');
-  assert.ok(!argv.includes('example.internal'), '원격 URL 이 argv 에 절대 실리면 안 된다(ADR-006)');
-  assert.ok(argv.includes('/x/.mcp.json'));
+  // local 1건 × pass 수. remote 는 pass 를 만들기 전에 통째로 걸러지므로 여기에 안 섞인다.
+  assert.equal(spy.calls.length, SCANNER_PASSES.length, 'local 1건만, 그 대상의 pass 수만큼 spawn 돼야 한다');
+  for (const call of spy.calls) {
+    const argv = call.join(' ');
+    assert.ok(!argv.includes('example.internal'), '원격 URL 이 argv 에 절대 실리면 안 된다(ADR-006)');
+    assert.ok(argv.includes('/x/.mcp.json'));
+  }
   assert.equal(result.unscanned.length, 1);
   assert.equal(result.unscanned[0].target.name, 'remote-srv');
 });

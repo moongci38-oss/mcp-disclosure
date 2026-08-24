@@ -1,6 +1,7 @@
 // src/runner.ts (1/2 — buildScannerArgs만, scanOne은 Task 7)
 import { spawn as nodeSpawn } from 'node:child_process';
 import type { ScanTarget, Unscanned, UnscannedReason } from './types.js';
+import { mergeScannerRawEnvelopes } from './scanner-envelope.js';
 
 // Task 8b 실측(2026-08-22, `pip install cisco-ai-mcp-scanner`로 격리 venv 설치 후
 // `mcp-scanner --help`/`config --help`/`remote --help` 직접 실행 — 버전 4.8.3):
@@ -24,15 +25,68 @@ import type { ScanTarget, Unscanned, UnscannedReason } from './types.js';
 //    반드시 후자를 키로 써야 한다. 재현: 개정안 문서 §2.2.
 const LOCAL_SAFE_ANALYZERS = ['yara', 'readiness', 'vulnerable_package', 'prompt_defense'];
 
-export function buildScannerArgs(target: ScanTarget, opts: { allowRemote: boolean }): string[] | null {
+// ⚠️ **분리 실행(2026-08-24)** — 한 번에 다 돌리면 결과가 틀어진다.
+//
+// mcp-scanner 4.8.3 의 `core/scanner.py` 는 YARA 파라미터 스캔을 하면서
+// `del tool_data["description"]` 로 **도구 정의 원본 dict 를 지운다**. 그 dict 는 같은 함수
+// 안에서 곧바로 readiness 에 `tool_definition` 으로 넘어간다 — 즉 **YARA 를 함께 켜면
+// readiness 가 설명이 빈 도구를 보게 된다.**
+//   거짓 양성: HEUR-009("설명 없음")가 설명 있는 도구 전부에 붙는다.
+//   거짓 음성: 설명을 근거로 삼는 HEUR-017·019 가 조용히 사라진다(auth_oauth 축의 신호원).
+//
+// 쉽게 말하면 **앞사람이 답안지 한 칸을 지우고 뒷사람에게 넘기는 것**이라, 시험지를 따로 돌린다.
+// 실측 대조표·재현 명령: `docs/research/2026-08-24-scanner-module-call-poc.md` §3.
+//
+// ⚠️ **지금 당장의 이득은 0 이고 비용만 실재한다 — 이 사실을 숨기지 않는다.**
+//    실측(2026-08-24, fixture 3도구): 단일 6,252ms → 분리 합계 12,203ms (**+95%**).
+//    그런데 **CLI raw 봉투는 두 방식이 완전히 동일하다** — readiness·promptdefense·yara 전부
+//    `total_findings`·`severity`·`threat_names`·`threat_summary` 가 한 글자도 다르지 않았다.
+//    CLI 롤업에는 rule id 가 없어서, 어떤 규칙이 발화했는지가 바뀌어도 겉으로 안 드러난다
+//    (거짓 양성 HEUR-009 가 들어오고 HEUR-019 가 빠져도 개수는 22 로 같았다).
+//
+//    즉 이 분리가 고치는 것은 **결과의 내용**이지 **지금 출력되는 소견서 텍스트**가 아니다.
+//    효과는 모듈 직접 호출(안 B)로 전환해 rule id 를 살리는 순간 즉시 드러난다 — 그때
+//    이 분리가 없으면 살려낸 rule id 절반이 틀린 값이 된다. 원인을 먼저 없애 두는 쪽을 택했다.
+//
+// 폐기조건(둘 중 하나면 이 분리를 되돌리고 단일 pass 로 복귀한다):
+//   ① 상류가 `tool_data` 사본을 뜨도록 고쳐진다(우리 패치든 upstream 이든).
+//      확인: `probe-scanner-module.py --combo` 가 두 조합에서 같은 rule_id 집합을 낼 때.
+//   ② 모듈 전환을 하지 않기로 결정한다 — 그러면 이 비용은 영영 회수되지 않는다.
+export type ScannerPass = { name: string; analyzers: string[] };
+export const SCANNER_PASSES: ScannerPass[] = [
+  // readiness 는 **혼자** 돌린다 — 위 버그의 피해자다.
+  { name: 'readiness', analyzers: ['readiness'] },
+  // 나머지는 서로 간섭이 관측되지 않아 함께 돌린다.
+  { name: 'pattern', analyzers: ['yara', 'vulnerable_package', 'prompt_defense'] },
+];
+
+export function buildScannerArgs(
+  target: ScanTarget,
+  opts: { allowRemote: boolean },
+  analyzers: string[] = LOCAL_SAFE_ANALYZERS,
+): string[] | null {
   if (target.transport === 'remote' && !opts.allowRemote) {
     return null; // argv 에 절대 넣지 않는다 — ADR-006
   }
-  const globalArgs = ['--format', 'raw', '--analyzers', LOCAL_SAFE_ANALYZERS.join(',')];
+  const globalArgs = ['--format', 'raw', '--analyzers', analyzers.join(',')];
   if (target.transport === 'remote') {
     return [...globalArgs, 'remote', '--server-url', target.remoteUrl!];
   }
   return [...globalArgs, 'config', '--config-path', target.sourcePath];
+}
+
+/** 대상 하나를 스캔하기 위해 실제로 실행할 pass 목록. remote 차단 시 null(기존과 동일). */
+export function buildScannerPasses(
+  target: ScanTarget,
+  opts: { allowRemote: boolean },
+): { pass: ScannerPass; args: string[] }[] | null {
+  const out: { pass: ScannerPass; args: string[] }[] = [];
+  for (const pass of SCANNER_PASSES) {
+    const args = buildScannerArgs(target, opts, pass.analyzers);
+    if (args === null) return null; // remote 차단은 pass 와 무관하게 대상 전체에 적용된다
+    out.push({ pass, args });
+  }
+  return out;
 }
 
 // src/runner.ts (2/2 — scanOne 추가)
@@ -97,15 +151,50 @@ export function classifyScannerFailure(exitCode: number | null, stderr: string, 
   };
 }
 
+/**
+ * 대상 하나를 **여러 pass 로 나눠** 스캔하고 결과 봉투를 합친다.
+ *
+ * 왜 나누는지는 위 `SCANNER_PASSES` 주석 참조(상류 버그 회피).
+ *
+ * **부분 성공을 허용하지 않는다** — pass 하나라도 실패하면 대상 전체를 `unscanned` 로 돌린다.
+ * 반쪽 결과를 소견서에 실으면 읽는 사람은 "스캔했는데 안 나왔다"로 읽는다. 그것은
+ * 이 제품이 가장 하지 말아야 할 거짓말이다(못 본 것은 못 봤다고 말한다).
+ * 어느 pass 에서 무너졌는지는 `detail` 앞머리 `[pass:<이름>]` 으로 남긴다.
+ *
+ * ⚠️ 타임아웃은 **pass 마다** 적용된다 — 대상 하나의 최대 소요는 `timeoutMs × pass 수`다.
+ */
 export async function scanOne(
   target: ScanTarget,
   opts: ScanOneOpts,
   deps: ScanDeps = DEFAULT_DEPS,   // ← 테스트가 fake spawn 을 넘기는 지점
 ): Promise<{ raw?: unknown; unscanned?: Unscanned }> {
-  const spawn = deps.spawn;
-  const args = opts.scannerArgsOverride ?? buildScannerArgs(target, opts);
-  if (args === null) return { unscanned: { target, reason: 'remote_out_of_scope' } };
+  // 테스트·디버깅용 argv 직접 주입은 단일 pass 로 그대로 실행한다(하위호환).
+  if (opts.scannerArgsOverride) {
+    return runOnePass(target, opts.scannerArgsOverride, opts, deps);
+  }
 
+  const passes = buildScannerPasses(target, opts);
+  if (passes === null) return { unscanned: { target, reason: 'remote_out_of_scope' } };
+
+  const raws: unknown[] = [];
+  for (const { pass, args } of passes) {
+    const result = await runOnePass(target, args, opts, deps);
+    if (result.unscanned) {
+      const detail = `[pass:${pass.name}] ${result.unscanned.detail ?? ''}`.trim();
+      return { unscanned: { ...result.unscanned, detail } };
+    }
+    raws.push(result.raw);
+  }
+  return { raw: mergeScannerRawEnvelopes(raws) };
+}
+
+async function runOnePass(
+  target: ScanTarget,
+  args: string[],
+  opts: ScanOneOpts,
+  deps: ScanDeps,
+): Promise<{ raw?: unknown; unscanned?: Unscanned }> {
+  const spawn = deps.spawn;
   const timeoutMs = opts.timeoutMs ?? DEFAULT_TIMEOUT_MS;
   const bin = opts.scannerBin ?? 'mcp-scanner';
 
