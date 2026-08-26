@@ -103,6 +103,64 @@ function resolveTaxonomy(
   return typeof sub === 'string' && sub.length > 0 ? sub : undefined;
 }
 
+/**
+ * 같은 대상을 여러 번(분석기 그룹을 나눠) 스캔한 봉투들을 하나로 합친다.
+ *
+ * **왜 나눠 돌리나**: mcp-scanner 4.8.3 은 YARA 파라미터 스캔에서
+ * `del tool_data["description"]` 으로 도구 정의 원본을 지우고, 그 dict 를 그대로
+ * readiness 에 넘긴다. 그래서 **YARA 와 readiness 를 한 번에 돌리면 readiness 가 설명이
+ * 빈 도구를 보게 된다** — HEUR-009("설명 없음")가 설명 있는 도구에 거짓 양성으로 붙고,
+ * 설명 기반 규칙(HEUR-017·019)은 거짓 음성으로 사라진다.
+ * 실측·재현: `docs/research/2026-08-24-scanner-module-call-poc.md` §3.
+ *
+ * 쉽게 말하면 **한 사람이 앞사람 답안지를 지우고 넘기는 상황**이라, 시험지를 따로 돌린다.
+ *
+ * 병합 규칙: 같은 스캔 항목(도구/프롬프트/리소스)끼리 `findings` 객체를 얹는다.
+ * 분석기 키는 그룹마다 달라 겹치지 않는 것이 정상이며, 혹시 겹치면 **먼저 온 쪽을 남긴다**
+ * (뒤엣것으로 덮어쓰면 어느 실행 결과인지 추적이 끊긴다).
+ */
+export function mergeScannerRawEnvelopes(envelopes: unknown[]): unknown {
+  const valid = envelopes.filter((e): e is ScannerRawEnvelope => !!e && typeof e === 'object');
+  if (valid.length === 0) return { scan_results: [] };
+  if (valid.length === 1) return valid[0];
+
+  const entryKey = (e: RawScanResultEntry): string =>
+    [e.item_type, e.server_name, e.server_source, e.tool_name, e.resource_name, e.prompt_name]
+      .map((v) => (typeof v === 'string' ? v : ''))
+      .join(' ');
+
+  const merged = new Map<string, RawScanResultEntry>();
+  const analyzers: string[] = [];
+  let serverUrl: string | undefined;
+
+  for (const env of valid) {
+    if (serverUrl === undefined && typeof env.server_url === 'string') serverUrl = env.server_url;
+    for (const a of Array.isArray(env.requested_analyzers) ? env.requested_analyzers : []) {
+      if (!analyzers.includes(a)) analyzers.push(a);
+    }
+    for (const entry of Array.isArray(env.scan_results) ? env.scan_results : []) {
+      const key = entryKey(entry);
+      const prev = merged.get(key);
+      if (!prev) {
+        merged.set(key, { ...entry, findings: { ...(entry.findings ?? {}) } });
+        continue;
+      }
+      // findings 만 얹는다. 나머지 필드는 먼저 온 항목의 것을 유지한다.
+      for (const [analyzer, summary] of Object.entries(entry.findings ?? {})) {
+        if (analyzer in (prev.findings ?? {})) continue; // 먼저 온 쪽 우선
+        prev.findings = { ...(prev.findings ?? {}), [analyzer]: summary };
+      }
+      // is_safe 는 **하나라도 안전하지 않으면 안전하지 않다**. 낙관 병합 금지.
+      if (prev.is_safe === true && entry.is_safe === false) prev.is_safe = false;
+    }
+  }
+
+  const out: ScannerRawEnvelope = { scan_results: [...merged.values()] };
+  if (serverUrl !== undefined) out.server_url = serverUrl;
+  if (analyzers.length > 0) out.requested_analyzers = analyzers;
+  return out;
+}
+
 export function parseScannerRawEnvelope(raw: unknown, fallbackTarget: string): RawFinding[] {
   const envelope = raw as ScannerRawEnvelope;
   const scanResults = Array.isArray(envelope?.scan_results) ? envelope.scan_results : [];
