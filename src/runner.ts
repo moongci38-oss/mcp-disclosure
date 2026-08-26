@@ -49,9 +49,13 @@ const LOCAL_SAFE_ANALYZERS = ['yara', 'readiness', 'vulnerable_package', 'prompt
 //    이 분리가 없으면 살려낸 rule id 절반이 틀린 값이 된다. 원인을 먼저 없애 두는 쪽을 택했다.
 //
 // 폐기조건(둘 중 하나면 이 분리를 되돌리고 단일 pass 로 복귀한다):
-//   ① 상류가 `tool_data` 사본을 뜨도록 고쳐진다(우리 패치든 upstream 이든).
-//      확인: `probe-scanner-module.py --combo` 가 두 조합에서 같은 rule_id 집합을 낼 때.
+//   ① 상류가 `tool_data` 사본을 뜨도록 고쳐진다.
+//      → **상류 PR #228 이 바로 그것이다**(open·mergeable·테스트 포함, 2026-08-26 확인).
+//        확인: `gh pr view 228 --repo cisco-ai-defense/mcp-scanner --json state`
+//        또는 `probe-scanner-module.py --combo` 가 두 조합에서 같은 rule_id 집합을 낼 때.
 //   ② 모듈 전환을 하지 않기로 결정한다 — 그러면 이 비용은 영영 회수되지 않는다.
+//      ⚠️ 2026-08-26: 상류 PR **#206** 이 `--raw` 에 rule_id 를 싣는다. 그게 머지되면
+//        모듈 전환 자체가 불필요해지므로 ②의 판단도 그 PR 에 달려 있다. → `upstream/README.md`
 export type ScannerPass = { name: string; analyzers: string[] };
 export const SCANNER_PASSES: ScannerPass[] = [
   // readiness 는 **혼자** 돌린다 — 위 버그의 피해자다.
