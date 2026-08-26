@@ -36,7 +36,11 @@ test('테스트 산출물과 소스는 배포하지 않는다(용량·노이즈)
   const files = packedFiles();
   assert.equal(files.filter(f => f.startsWith('dist/test/')).length, 0);
   assert.equal(files.filter(f => f.startsWith('src/')).length, 0, '컴파일 결과만 배포한다');
-  assert.equal(files.filter(f => f.startsWith('docs/') || f.startsWith('fixtures/')).length, 0);
+  // `upstream/` 은 상류에 낼 패치 보관소다 — 우리 배포물이 아니다(2026-08-26 신설).
+  assert.equal(
+    files.filter(f => f.startsWith('docs/') || f.startsWith('fixtures/') || f.startsWith('upstream/')).length,
+    0,
+  );
 });
 
 // files 필드가 사라지면 .gitignore 규칙이 되살아나 dist 가 다시 빠진다 — 그 회귀를 못 박는다.
