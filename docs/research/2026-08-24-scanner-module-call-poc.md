@@ -163,11 +163,40 @@ PR 을 내기 직전 상류 `CONTRIBUTING.md` 가 요구하는 **중복 검색**
 **우리 실측이 헛되지 않은 이유**: #227 은 HEUR-009 거짓 양성 + HEUR-012 왜곡을 봤고, 우리는
 **HEUR-017·019 거짓 음성**을 봤다. auth_oauth 축의 신호원이 죽는다는 것은 우리 관측이 처음이다.
 
+### 4-4. readiness 20개 규칙 전수 ↔ 15축 대조 (2026-08-26)
+
+§5 한계 ②에 "sdlc 축은 대응 규칙을 아직 안 찾았다"고 적어 뒀던 것을 해소했다.
+`readiness_analyzer.py` 의 규칙 카탈로그(파일 머리 주석)를 전수로 읽고 우리 축에 대조했다.
+
+| 규칙군 | 규칙 | 우리 축 |
+|---|---|---|
+| Timeout Guards | HEUR-001·002 | operational_reliability |
+| Retry Configuration | HEUR-003·004·005 | operational_reliability |
+| Error Handling | HEUR-006·007·008 | operational_reliability |
+| Description Quality | HEUR-009·010 | operational_reliability |
+| Input Validation | HEUR-011·012 | operational_reliability |
+| Operational Config | HEUR-013(레이트리밋)·**014(버전)**·**015(관측성)** | operational_reliability / **sdlc** / **logging** |
+| Resource Management | HEUR-016·017 | operational_reliability |
+| Safety | **018(위험 키워드)**·**019(인증 컨텍스트)**·020(순환 의존) | **tool_permission** / **auth_oauth** / operational_reliability |
+
+**드러난 것 — `ontology.yaml` 의 sdlc 서술이 부정확했다.**
+종전에는 "빌드·릴리스 파이프라인 신호를 내는 분석기를 아직 확인하지 못했다"고 적혀 있었는데,
+**HEUR-014(도구 버전 미표기)가 이 축에 부분적으로 걸린다.** 즉 sdlc 가 막힌 이유는
+tool_permission·auth_oauth·logging 과 **같은 부류**다 — 분석기는 신호를 내는데 CLI 가 rule id 를
+떨어뜨린다. `unreachable_reason` 은 **소견서에 그대로 실리는 문구**라 이 부정확함을 정정했다.
+
+⚠️ 다만 종전 서술의 절반은 맞다 — **빌드·릴리스 파이프라인 자체를 보는 규칙은 여전히 없다.**
+HEUR-014 는 "버전 문자열이 적혀 있나"를 볼 뿐 CI·서명·릴리스 절차를 보지 않는다.
+
+**`data_flow` 축은 대응 규칙이 정말 없다** — 20개 중 taint-tracking 성격의 규칙은 하나도 없었다.
+그 축의 종전 서술은 정확하므로 그대로 둔다.
+
 ## 5. 이 실험의 한계
 
 1. **fixture 3개 도구가 전부다.** 실제 MCP 서버 생태계에서 이 규칙들이 얼마나 자주 발화하는지는
    모른다 — "잡힌다"와 "쓸모 있다"는 다른 주장이다.
-2. **sdlc 축은 이번에 손대지 않았다.** 후보 21건짜리 축인데 대응 규칙을 아직 찾지 않았다.
+2. ~~**sdlc 축은 이번에 손대지 않았다.**~~ → **2026-08-26 해소**(§4-4). HEUR-014 가 부분 대응이고,
+   막힌 이유가 다른 세 축과 같은 부류임을 확인해 `ontology.yaml` 서술을 정정했다.
 3. **상류 버그는 4.8.3 한 버전에서만 확인**했다. 다른 버전에서 고쳐졌는지 확인하지 않았다.
 4. 성능을 재지 않았다 — 안 A 의 "2회 실행" 비용이 실제로 얼마인지 모른다.
 
