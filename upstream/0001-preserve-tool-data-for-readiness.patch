@@ -1,0 +1,37 @@
+--- a/mcpscanner/core/scanner.py
++++ b/mcpscanner/core/scanner.py
+@@ -912,10 +912,14 @@
+ 
+             # Run YARA analysis on the tool parameters
+             try:
+-                # Remove description from the JSON as it is already analyzed
+-                if "description" in tool_data:
+-                    del tool_data["description"]
+-                tool_json_str = json.dumps(tool_data)
++                # Exclude the description from the parameter scan; it was analyzed above.
++                # NOTE: do not mutate `tool_data` itself -- it is passed on to the
++                # readiness analyzer below as `tool_definition`. Deleting the key here
++                # makes readiness see a tool with no description, which flips
++                # description-based heuristics (false positive HEUR-009, false negative
++                # HEUR-017/019).
++                tool_params_only = {k: v for k, v in tool_data.items() if k != "description"}
++                tool_json_str = json.dumps(tool_params_only)
+                 yara_params_context = {"tool_name": name, "content_type": "parameters"}
+                 yara_params_findings = await self._yara_analyzer.analyze(
+                     tool_json_str, yara_params_context
+@@ -1078,10 +1082,11 @@
+ 
+             # Run YARA analysis on the prompt arguments/structure
+             try:
+-                # Remove description from the JSON as it is already analyzed
+-                if "description" in prompt_data:
+-                    del prompt_data["description"]
+-                prompt_json_str = json.dumps(prompt_data)
++                # Exclude the description from the argument scan; it was analyzed above.
++                # NOTE: same rationale as the tool path -- do not mutate `prompt_data`,
++                # which is read again further down.
++                prompt_args_only = {k: v for k, v in prompt_data.items() if k != "description"}
++                prompt_json_str = json.dumps(prompt_args_only)
+                 yara_params_context = {"prompt_name": name, "content_type": "arguments"}
+                 yara_params_findings = await self._yara_analyzer.analyze(
+                     prompt_json_str, yara_params_context
