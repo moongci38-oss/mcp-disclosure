@@ -126,10 +126,17 @@ axes:
     coverage: partial
     claim_type: technical_control
     signal_status: unreachable_in_v0
-    # (ko) 빌드·릴리스 파이프라인 신호를 내는 분석기를 아직 확인하지 못했다.
+    # (ko) 2026-08-26 정정 — 종전 서술("분석기가 아예 없다")은 **부정확했다.**
+    #   readiness 20개 규칙을 전수로 확인한 결과 HEUR-014(버전 정보 미표기)가 이 축에
+    #   부분적으로 걸린다. 즉 이 축이 막힌 이유는 tool_permission·auth_oauth·logging 과
+    #   **같은 부류**다 — 분석기는 신호를 내는데 CLI 가 rule id 를 떨어뜨린다.
+    #   다만 빌드·릴리스 파이프라인 자체를 보는 규칙은 여전히 없다(그 부분은 종전 서술이 맞다).
+    #   근거: docs/research/2026-08-24-scanner-module-call-poc.md §4-4
     unreachable_reason: >-
-      Not observable via this scanner. No analyzer producing build/release pipeline signals has been observed. None of
-      the four key-free analyzers in mcp-scanner 4.8.3 emits a signal for this axis.
+      Not observable via this scanner. One readiness rule is partially related (HEUR-014, missing tool version), but
+      mcp-scanner 4.8.3 drops readiness rule ids from CLI output (report_generator.py:82 serializes only
+      details["threat_type"]), so it cannot be attributed to this axis. No analyzer observes the build/release
+      pipeline itself.
 
   # ============================================================
   # not_scannable (5) — 조직·계약 문서 영역(기술 신호의 대상이 아님)
