@@ -22,10 +22,84 @@ function ontologyPath(): string {
   return resolve(dirname(fileURLToPath(import.meta.url)), '..', '..', 'ontology.yaml');
 }
 
+// 패키지 버전은 package.json 에서 읽는다 — 코드에 박아두면 릴리스마다 갈라진다.
+// 경로 규칙은 ontologyPath() 와 같다(dist/src/cli.js → <package root>).
+export function readPackageVersion(): string {
+  try {
+    const p = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..', 'package.json');
+    const pkg = JSON.parse(readFileSync(p, 'utf8')) as { version?: unknown };
+    return typeof pkg.version === 'string' ? pkg.version : 'unknown';
+  } catch {
+    return 'unknown';
+  }
+}
+
+export const USAGE = `mcp-disclosure — a configuration disclosure CLI for AI agent / MCP setups.
+
+It reports three things side by side: what it found, what it looked for and did not
+find, and what it cannot check at all.
+
+USAGE
+  mcp-disclosure scan [options]
+
+OPTIONS
+  --path <dir>        Directory to scan (default: current directory)
+  --allow-remote      Opt in to scanning remote MCP endpoints (off by default)
+  --scan-timeout <ms> Per-scan timeout in milliseconds (default: 120000)
+  -h, --help          Show this help
+  -v, --version       Show version
+
+OUTPUT
+  Writes two files into the scanned directory:
+    mcp-disclosure-findings.md    the report you read
+    mcp-disclosure-findings.json  the same data, complete
+
+REQUIREMENTS
+  Python 3.11+ and the Cisco MCP scanner:
+    pip install cisco-ai-mcp-scanner
+
+EXIT CODES
+  0  report written
+  1  nothing to scan, or a prerequisite is missing
+  2  ontology/config error
+
+Docs: https://github.com/moongci38-oss/mcp-disclosure
+`;
+
 export async function main(argv: string[]): Promise<void> {
+  // ⚠️ --help/--version 은 **다른 무엇보다 먼저** 처리한다.
+  // 2026-08-27 공개 직후 실측: 이 분기가 없어서 `mcp-disclosure --help` 가 스캔으로 흘러가
+  // "No agent configuration found" 를 뱉었다 — 새 CLI 를 만난 사람이 가장 먼저 치는 명령인데
+  // 첫 화면이 에러였다. Python·스캐너가 없어도 도움말은 나와야 하므로 사전점검보다 앞에 둔다.
+  if (argv.includes('-h') || argv.includes('--help')) {
+    process.stdout.write(USAGE);
+    return;
+  }
+  if (argv.includes('-v') || argv.includes('--version')) {
+    process.stdout.write(`${readPackageVersion()}\n`);
+    return;
+  }
+
   const pathIdx = argv.indexOf('--path');
   const rootDir = pathIdx >= 0 ? argv[pathIdx + 1] : process.cwd();
   const allowRemote = argv.includes('--allow-remote');
+
+  // ⚠️ 2026-08-27 배선. `--scan-timeout` 은 Spec §2.1 FR-01 시그니처에도 있고 runner.ts 주석도
+  //    "이 플래그로 조정한다"고 안내해 왔지만, **cli.ts 가 argv 에서 읽은 적이 한 번도 없었다** —
+  //    선언만 있고 소비처가 0 인, 이 프로젝트가 반복해서 잡아온 그 패턴이다.
+  //    도움말을 쓰다가 발견했다(없는 플래그를 안내할 뻔했다).
+  const timeoutIdx = argv.indexOf('--scan-timeout');
+  let timeoutMs: number | undefined;
+  if (timeoutIdx >= 0) {
+    const raw = argv[timeoutIdx + 1];
+    const parsed = Number(raw);
+    // 잘못된 값을 조용히 기본값으로 삼키지 않는다 — 사용자는 자기가 준 값이 무시된 줄 모른다.
+    if (!Number.isFinite(parsed) || parsed <= 0) {
+      process.stderr.write(`--scan-timeout expects a positive number of milliseconds (got: ${raw ?? '<missing>'})\n`);
+      process.exit(2);
+    }
+    timeoutMs = parsed;
+  }
 
   const py = checkPythonAvailable();
   if (!py.ok) {
@@ -71,7 +145,7 @@ export async function main(argv: string[]): Promise<void> {
     process.exit(1);
   }
 
-  const runnerResult = await runScanner(targets, { allowRemote });
+  const runnerResult = await runScanner(targets, { allowRemote, timeoutMs });
   // A-1 codex 반영: 종전엔 `r.findings ?? []` 로 직접 읽어 findings 가 항상 0건이었다(raw 는
   // findings 배열이 아니라 봉투다). parseScannerRawEnvelope 하나로 이 계약을 강제한다.
   const rawFindings = [...runnerResult.rawByTarget.entries()]
@@ -95,11 +169,16 @@ export async function main(argv: string[]): Promise<void> {
     name: 'cisco-mcp-scanner',
     // ⚠️ 실측(Session 1): 이 스캐너에는 `--version` 플래그가 아예 없다(argparse 가 exit 2 로 거부).
     //    그래서 이 값은 거의 항상 부재다 — 부재를 부재라고 적는다.
-    version: scannerVersion ?? 'unavailable',
-    ruleset_hash: 'unavailable',
+    // ⚠️ 2026-08-27 문구 정정: 종전에는 맨 `'unavailable'` 이었다. 헤더가
+    //    `Scanner: ${name} ${version}` 형식이라 **"cisco-mcp-scanner unavailable"** 로 찍혔고,
+    //    스캔이 성공했는데도 **"스캐너가 없어서 실패했다"로 읽혔다.** 부재의 대상(=버전)과
+    //    사유를 값 안에 넣어 그 오독을 막는다. render.ts 가 요구하는 `unavailable: <why>` 계약과도
+    //    이제 맞는다(맨 'unavailable' 은 그 계약의 의도를 절반만 지킨 값이었다).
+    version: scannerVersion ?? '(version not reported by this scanner)',
+    ruleset_hash: 'unavailable: not exposed by this scanner',
     scanned_at: new Date().toISOString(),
     target_hash: targetHash,
-    python_version: py.version ?? 'unavailable',
+    python_version: py.version ?? 'unavailable: python version not readable',
   };
 
   // A-4 codex 반영: 종전엔 normalize() 반환값에서 unmatchedSignals 를 버리고 render() 에 항상

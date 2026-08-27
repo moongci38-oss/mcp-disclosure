@@ -29,9 +29,11 @@ No findings ≠ proof of safety — undetected as of 2026-08-22T08:51:19Z, per c
 ## Usage
 
 ```bash
+npx mcp-disclosure --help               # what it does and every flag it takes
 npx mcp-disclosure scan                 # scan the current directory
 npx mcp-disclosure scan --path ./repo   # scan a specific directory
 npx mcp-disclosure scan --allow-remote  # opt in to scanning remote MCP endpoints (off by default)
+npx mcp-disclosure scan --scan-timeout 300000   # raise the per-scan timeout (default 120000 ms)
 ```
 
 Writes two files next to the scanned directory:
