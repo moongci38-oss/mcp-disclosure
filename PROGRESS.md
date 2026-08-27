@@ -152,7 +152,8 @@ agenttrust 가 아니라 `~/forge` 를 뒤지고 있었다). **2026-08-22 수리
 - ~~**Task 28~29 미착수**~~ — **오독이었다(2026-08-22 정정).** Spec 의 "29 태스크"는
   **번호 1~27 + `8a` + `8b`** 를 센 것이다(Session 1 이 codex 반영으로 2개 신설).
   누락된 태스크는 없고 **Task 1~27 전량 완료**다.
-  재현: `grep -cE '^\*\*Task [0-9]+[a-z]?:' docs/planning/SPEC-v0-cli.md` → `29`
+  재현: Spec 은 비공개 기획 저장소에 있다 — 그쪽에서
+  `grep -cE '^\*\*Task [0-9]+[a-z]?:' docs/planning/SPEC-v0-cli.md` → `29`
 - Spec §12 미결: ⑤(종결) · ⑥ fixture 디렉터리명/`supportedScannerRange` 정리 · ①npm 배포명
 
 ### Spec 감사 결과 (2026-08-22, Session 4 후속)

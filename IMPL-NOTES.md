@@ -60,8 +60,9 @@
   때문이었고, YARA 발화 시·`promptdefense_analyzer`는 `aitech`/`aisubtech`를 정상 반환한다.
   그리고 **`prompt_defense` 분석기는 API 키 없이 exit 0으로 동작**하며 12종 카테고리를 정확
   문자열로 낸다 — Session 1의 `--analyzers` 조합에서 빠져 있었다.
-  → 개정안: `docs/planning/SPEC-v0-cli-AMENDMENT-01-signal-map.md` (**[STOP] 승인 대기 — 승인 전
-  Task 9 착수 금지**). 재현 명령·원본 출력: 그 문서 §2 · `docs/measurements/2026-08-22-signal-space/`
+  → 개정안 #01 로 해소(승인·반영 완료). 그 설계 문서는 비공개 기획 저장소에 있고, 결과물은
+  이 저장소의 `ontology.yaml`(`signal_map`)에 그대로 반영돼 있다.
+  재현 명령·원본 출력: `docs/measurements/2026-08-22-signal-space/`
 
 - **Session 2 구현 중 발견 (2026-08-22)**
   1. **테스트 fixture 자체가 틀려서 검증 경로를 안 타는 사례.** `assignAxis` 의 "taxonomy 가
