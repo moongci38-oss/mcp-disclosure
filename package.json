@@ -24,7 +24,7 @@
     "@types/js-yaml": "^4.0.9"
   },
   "license": "MIT",
-  "author": "lumir",
+  "author": "moongci38-oss",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/moongci38-oss/mcp-disclosure.git"
