@@ -58,11 +58,16 @@ assignees: ''
 <!-- What actually happens -->
 <!-- 실제로 발생하는 동작 -->
 
-## Related Spec
+## Scanner output
 
-<!-- Link to the related Spec file if applicable -->
-<!-- 관련 Spec 파일이 있으면 링크하세요 -->
-- Spec: `.specify/specs/[spec-name].md`
+<!-- If the scan produced a report, the header line is the most useful part:
+     it pins the scanner, ruleset, timestamp and target hash. -->
+<!-- 스캔이 리포트를 만들었다면 헤더 한 줄이 가장 유용합니다 —
+     스캐너·룰셋·시각·대상 해시가 거기 다 있습니다. -->
+
+```
+Scanner: ... · Ruleset: ... · Scanned: ... · Target: ... · Python: ...
+```
 
 ## Screenshots
 

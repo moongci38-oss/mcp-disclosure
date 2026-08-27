@@ -35,10 +35,11 @@
   Deployment: Copy to .github/pull_request_template.md in your project
 ============================================================================= -->
 
-## Related Spec
+## Related issue
 
-<!-- Link the related Spec document (구현 계획·ADR·Wave = Spec §8/§11 — 별도 Plan 파일 없음) -->
-- **Spec**: `.specify/specs/[spec-name].md`
+<!-- Link the issue this PR closes, if any. -->
+<!-- 이 PR이 닫는 이슈가 있으면 링크하세요. -->
+- Closes #
 
 ## Description
 
