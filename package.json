@@ -24,6 +24,25 @@
     "@types/js-yaml": "^4.0.9"
   },
   "license": "MIT",
+  "author": "moongci38-oss",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/moongci38-oss/mcp-disclosure.git"
+  },
+  "homepage": "https://github.com/moongci38-oss/mcp-disclosure#readme",
+  "bugs": {
+    "url": "https://github.com/moongci38-oss/mcp-disclosure/issues"
+  },
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "ai-agent",
+    "security",
+    "scanner",
+    "disclosure",
+    "coverage",
+    "cli"
+  ],
   "files": [
     "dist/src/",
     "bin/",
