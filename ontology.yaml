@@ -86,8 +86,9 @@ axes:
     # (ko) HEUR-018 rule_id 가 CLI 출력에서 소실 + destructive_capabilities YARA 룰 부재.
     # ⚠️ 이 필드는 소견서에 그대로 실린다 — Spec §0 에 따라 **영문으로 쓴다**.
     unreachable_reason: >-
-      Not observable via this scanner. readiness rule id HEUR-018 is dropped from mcp-scanner 4.8.3 CLI output
-      (report_generator.py:82 serializes only details["threat_type"]), and the
+      Not observable via this scanner. readiness rule id HEUR-018 is dropped from the mcp-scanner CLI output
+      (as measured on 4.8.3 — the running build cannot be pinned;
+      report_generator.py:82 serializes only details["threat_type"]), and the
       assumed destructive_capabilities YARA rule does not exist (all 10 rule files
       checked). The axis is technically scannable, but this scanner's CLI emits no
       signal for it.
@@ -98,8 +99,9 @@ axes:
     signal_status: unreachable_in_v0
     # (ko) HEUR-019 rule_id 가 CLI 출력에서 소실.
     unreachable_reason: >-
-      Not observable via this scanner. readiness rule id HEUR-019 is dropped from mcp-scanner 4.8.3 CLI output
-      (report_generator.py:82). The axis is technically scannable, but this
+      Not observable via this scanner. readiness rule id HEUR-019 is dropped from the mcp-scanner CLI output
+      (as measured on 4.8.3 — the running build cannot be pinned;
+      report_generator.py:82). The axis is technically scannable, but this
       scanner's CLI emits no signal for it.
 
   data_flow:
@@ -109,8 +111,9 @@ axes:
     # (ko) taint-tracking 신호를 내는 분석기를 아직 확인하지 못했다.
     unreachable_reason: >-
       Not observable via this scanner. No analyzer producing taint-tracking signals has been observed. None of the four
-      key-free analyzers in mcp-scanner 4.8.3 (yara, readiness, vulnerable_package,
-      prompt_defense) emits a signal for this axis.
+      key-free analyzers in mcp-scanner (yara, readiness, vulnerable_package,
+      prompt_defense) emits a signal for this axis — as measured on 4.8.3;
+      the running build cannot be pinned.
 
   logging:
     coverage: partial
@@ -118,8 +121,9 @@ axes:
     signal_status: unreachable_in_v0
     # (ko) HEUR-015 rule_id 가 CLI 출력에서 소실.
     unreachable_reason: >-
-      Not observable via this scanner. readiness rule id HEUR-015 is dropped from mcp-scanner 4.8.3 CLI output
-      (report_generator.py:82). The axis is technically scannable, but this
+      Not observable via this scanner. readiness rule id HEUR-015 is dropped from the mcp-scanner CLI output
+      (as measured on 4.8.3 — the running build cannot be pinned;
+      report_generator.py:82). The axis is technically scannable, but this
       scanner's CLI emits no signal for it.
 
   sdlc:
@@ -134,7 +138,8 @@ axes:
     #   근거: docs/research/2026-08-24-scanner-module-call-poc.md §4-4
     unreachable_reason: >-
       Not observable via this scanner. One readiness rule is partially related (HEUR-014, missing tool version), but
-      mcp-scanner 4.8.3 drops readiness rule ids from CLI output (report_generator.py:82 serializes only
+      mcp-scanner drops readiness rule ids from CLI output (as measured on 4.8.3 — the running build
+      cannot be pinned; report_generator.py:82 serializes only
       details["threat_type"]), so it cannot be attributed to this axis. No analyzer observes the build/release
       pipeline itself.
 
