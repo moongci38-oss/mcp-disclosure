@@ -67,15 +67,28 @@ Writes two files next to the scanned directory:
 Exit codes: `0` report written · `1` no configuration found / Python missing · `2` ontology or
 render failed closed · `3` unexpected error.
 
-## No network calls
+## What runs, and what talks to the network
 
 mcp-disclosure makes **zero network calls of its own**. No telemetry, no upload, no license check.
-Everything runs locally and the report never leaves your disk unless you move it.
+The report never leaves your disk unless you move it.
 
-One deliberate exception, and it is opt-in: `--allow-remote` lets the underlying scanner connect
-to remote MCP endpoints you have configured. Without that flag, remote targets are **never placed
-in the scanner's argv at all** — they are listed as unscanned instead. When you do pass it, the
-report carries a banner saying a remote connection happened.
+That is the headline, and by itself it would be misleading. Two things follow from how MCP
+scanning actually works:
+
+**1. Scanning a local stdio server means starting it.** To list a server's tools, the scanner runs
+the `command` from your configuration as a child process — the same command your agent would run.
+If that command reaches the network, the network is reached. A config entry like
+`npx -y @modelcontextprotocol/server-filesystem` contacts the npm registry on first run, because
+that is what `npx` does. mcp-disclosure did not make the call; the command you configured did.
+Either way, packets leave your machine.
+
+The practical rule: **only scan configurations you would be willing to run.** Scanning an untrusted
+`.mcp.json` executes whatever it names.
+
+**2. Remote endpoints are opt-in.** `--allow-remote` lets the scanner connect to remote MCP
+endpoints you have configured. Without that flag, remote targets are **never placed in the
+scanner's argv at all** — they are listed as unscanned instead. When you do pass it, the report
+carries a banner saying a remote connection happened.
 
 ## Requirements
 
