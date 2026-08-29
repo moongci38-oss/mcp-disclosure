@@ -59,9 +59,10 @@ REQUIREMENTS
     pip install cisco-ai-mcp-scanner
 
 EXIT CODES
-  0  report written
+  0  report written (check stderr — some targets may have failed to scan)
   1  nothing to scan, or a prerequisite is missing
-  2  ontology/config error
+  2  invalid arguments, or an ontology/config error
+  3  unexpected error
 
 Docs: https://github.com/moongci38-oss/mcp-disclosure
 `;
