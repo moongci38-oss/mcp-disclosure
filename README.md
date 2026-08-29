@@ -68,6 +68,7 @@ npx mcp-disclosure scan                          # scan the current directory
 npx mcp-disclosure scan --path ./repo            # scan a specific directory
 npx mcp-disclosure scan --allow-remote           # opt in to scanning remote MCP endpoints (off by default)
 npx mcp-disclosure scan --scan-timeout 300000    # raise the per-scan timeout (default 120000 ms)
+npx mcp-disclosure scan --fail-on-unscanned      # exit 4 if anything could not be scanned (for CI)
 ```
 
 Installed globally or linked, drop the `npx`: `mcp-disclosure scan --path ./repo`.
@@ -78,12 +79,34 @@ Writes two files into the scanned directory:
 - `mcp-disclosure-findings.json` — the same data, complete (the markdown truncates long ID lists)
 
 Exit codes: `0` report written · `1` no configuration found / Python missing · `2` invalid arguments,
-or ontology / render failed closed · `3` unexpected error.
+or ontology / render failed closed · `3` unexpected error · `4` report written but some targets were
+unscanned (only with `--fail-on-unscanned`).
 
 Unknown flags and stray arguments are rejected with exit `2` rather than ignored — a typo like
 `--paht ./repo` must not quietly scan somewhere else. And exit `0` does not mean every target was
 scanned: if some could not be, a warning goes to stderr and the report lists them under
 **Unscanned items**.
+
+### Using it as a CI gate
+
+By default a run that scanned nothing still exits `0` — the report says so, but your pipeline sees
+green. That is deliberate: changing the default would break existing scripts. Opt in instead:
+
+```bash
+npx mcp-disclosure scan --fail-on-unscanned
+```
+
+This exits `4` **if any target could not be scanned**, and still writes both report files so you can
+read what was missed. The common trigger is a missing `mcp-scanner` — the exact case where a report
+would otherwise say "not evaluated" while CI says "passed".
+
+Two things to know before you turn it on:
+
+- **Remote targets count.** Without `--allow-remote`, remote MCP servers are recorded as unscanned
+  by design, so this flag will fail on them. Pass `--allow-remote` if you want them scanned, or
+  leave the flag off for configurations that have remote servers you deliberately skip.
+- **It is all-or-nothing, not majority.** One unscanned target out of ten fails the run. Partial
+  coverage passing quietly is the thing this flag exists to prevent.
 
 ## What runs, and what talks to the network
 

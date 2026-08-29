@@ -43,11 +43,15 @@ USAGE
   mcp-disclosure scan [options]
 
 OPTIONS
-  --path <dir>        Directory to scan (default: current directory)
-  --allow-remote      Opt in to scanning remote MCP endpoints (off by default)
-  --scan-timeout <ms> Per-scan timeout in milliseconds (default: 120000)
-  -h, --help          Show this help
-  -v, --version       Show version
+  --path <dir>          Directory to scan (default: current directory)
+  --allow-remote        Opt in to scanning remote MCP endpoints (off by default)
+  --scan-timeout <ms>   Per-scan timeout in milliseconds (default: 120000)
+  --fail-on-unscanned   Exit 4 if any target could not be scanned. Off by default;
+                        turn it on in CI so an empty scan cannot pass as success.
+                        Note: targets skipped because they are remote (without
+                        --allow-remote) count as unscanned too.
+  -h, --help            Show this help
+  -v, --version         Show version
 
 OUTPUT
   Writes two files into the scanned directory:
@@ -63,6 +67,7 @@ EXIT CODES
   1  nothing to scan, or a prerequisite is missing
   2  invalid arguments, or an ontology/config error
   3  unexpected error
+  4  report written, but some targets were unscanned (--fail-on-unscanned only)
 
 Docs: https://github.com/moongci38-oss/mcp-disclosure
 `;
@@ -73,7 +78,7 @@ const KNOWN_COMMANDS = ['scan'] as const;
 export type ParsedArgs =
   | { kind: 'help' }
   | { kind: 'version' }
-  | { kind: 'scan'; rootDir: string; allowRemote: boolean; timeoutMs?: number }
+  | { kind: 'scan'; rootDir: string; allowRemote: boolean; timeoutMs?: number; failOnUnscanned: boolean }
   | { kind: 'error'; message: string };
 
 /**
@@ -116,6 +121,7 @@ export function parseArgs(argv: string[]): ParsedArgs {
   let rootDir = process.cwd();
   let allowRemote = false;
   let timeoutMs: number | undefined;
+  let failOnUnscanned = false;
 
   for (let i = 1; i < argv.length; i++) {
     const arg = argv[i];
@@ -145,6 +151,12 @@ export function parseArgs(argv: string[]): ParsedArgs {
       continue;
     }
 
+    // CI 게이트. 기본 exit 0 계약은 그대로 두고, 원하는 사람만 켠다.
+    if (arg === '--fail-on-unscanned') {
+      failOnUnscanned = true;
+      continue;
+    }
+
     // ⚠️ 2026-08-27 배선. `--scan-timeout` 은 Spec §2.1 FR-01 시그니처에도 있고 runner.ts 주석도
     //    "이 플래그로 조정한다"고 안내해 왔지만, **cli.ts 가 argv 에서 읽은 적이 한 번도 없었다** —
     //    선언만 있고 소비처가 0 인, 이 프로젝트가 반복해서 잡아온 그 패턴이다.
@@ -169,7 +181,7 @@ export function parseArgs(argv: string[]): ParsedArgs {
     };
   }
 
-  return { kind: 'scan', rootDir, allowRemote, timeoutMs };
+  return { kind: 'scan', rootDir, allowRemote, timeoutMs, failOnUnscanned };
 }
 
 export async function main(argv: string[]): Promise<void> {
@@ -188,7 +200,7 @@ export async function main(argv: string[]): Promise<void> {
     process.exit(2);
     return;
   }
-  const { rootDir, allowRemote, timeoutMs } = parsed;
+  const { rootDir, allowRemote, timeoutMs, failOnUnscanned } = parsed;
 
   const py = checkPythonAvailable();
   if (!py.ok) {
@@ -311,6 +323,20 @@ export async function main(argv: string[]): Promise<void> {
     writeFileSync(join(rootDir, 'mcp-disclosure-findings.md'), markdown);
     writeFileSync(join(rootDir, 'mcp-disclosure-findings.json'), json);
     process.stdout.write('Report written: mcp-disclosure-findings.md, mcp-disclosure-findings.json\n');
+
+    // ⚠️ 옵트인 CI 게이트. 기본값(exit 0)은 건드리지 않는다 — 0 → 비0 은 사용자 스크립트를
+    //    깨는 계약 변경이라 별도 판단 대상이고, cli.scan-failure-signal.test.ts 가 그것을 잠근다.
+    //    다만 기본값만 있으면 "전부 스캔됨"과 "한 건도 못 스캔함"이 CI 에서 똑같이 초록불이다.
+    //    커버리지 정직성이 차별축인 도구가 "아무것도 못 봤다"를 성공으로 보고하면 그 축이 무너진다.
+    //    ⚠️ 소견서는 **이미 썼다** — 실패로 끝내되 읽을 것은 남긴다. 그게 이 도구의 요점이다.
+    if (failOnUnscanned && runnerResult.unscanned.length > 0) {
+      process.stderr.write(
+        `--fail-on-unscanned: ${runnerResult.unscanned.length} of ${targets.length} target(s) ` +
+        `could not be scanned, so this run is reported as a failure. ` +
+        `The report was still written — see "Unscanned items" for what was missed and why.\n`,
+      );
+      process.exit(4);
+    }
     process.exit(0);
   } catch (e) {
     if (e instanceof RenderError) {
