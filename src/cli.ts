@@ -66,40 +66,128 @@ EXIT CODES
 Docs: https://github.com/moongci38-oss/mcp-disclosure
 `;
 
-export async function main(argv: string[]): Promise<void> {
+/** 이 CLI 가 받는 서브커맨드 전부. 여기 없는 낱말은 명령이 아니다. */
+const KNOWN_COMMANDS = ['scan'] as const;
+
+export type ParsedArgs =
+  | { kind: 'help' }
+  | { kind: 'version' }
+  | { kind: 'scan'; rootDir: string; allowRemote: boolean; timeoutMs?: number }
+  | { kind: 'error'; message: string };
+
+/**
+ * argv 를 **전수 해석**한다 — 모르는 것은 버리지 않고 에러로 만든다.
+ *
+ * ⚠️ D2 회귀 (2026-08-29 첫인상 QA). 종전 파서는 `indexOf`/`includes` 로 아는 플래그만 집어가고
+ * 나머지는 조용히 버렸다. 그래서 `scan --paht /other` 가 **오타를 무시하고 cwd 를 스캔한 뒤**
+ * exit 0 `Report written` 을 냈다. 사용자는 /other 를 봤다고 믿지만 실제로는 딴 곳을 봤다.
+ * 아무것도 못 본 실행과 엉뚱한 것을 본 실행이 둘 다 성공처럼 보이면, 커버리지 정직성이라는
+ * 이 제품의 차별축이 무너진다.
+ *
+ * 규칙(도움말과 같은 말을 하도록 여기 한 곳에만 적는다):
+ *  - `-h/--help`, `-v/--version` 은 어디에 있든 가장 먼저 이긴다(사전점검보다도 앞).
+ *  - 첫 낱말은 반드시 KNOWN_COMMANDS 중 하나여야 한다.
+ *  - `--` 는 옵션 끝 표시다. 그 **뒤에 오는 것은 위치 인자**이고, 이 CLI 는 위치 인자를 받지 않는다.
+ *  - `-` 로 시작하는 미지의 낱말 = 알 수 없는 옵션. 그 밖의 낱말 = 위치 인자. 둘 다 exit 2.
+ */
+export function parseArgs(argv: string[]): ParsedArgs {
   // ⚠️ --help/--version 은 **다른 무엇보다 먼저** 처리한다.
   // 2026-08-27 공개 직후 실측: 이 분기가 없어서 `mcp-disclosure --help` 가 스캔으로 흘러가
   // "No agent configuration found" 를 뱉었다 — 새 CLI 를 만난 사람이 가장 먼저 치는 명령인데
   // 첫 화면이 에러였다. Python·스캐너가 없어도 도움말은 나와야 하므로 사전점검보다 앞에 둔다.
-  if (argv.includes('-h') || argv.includes('--help')) {
+  if (argv.includes('-h') || argv.includes('--help')) return { kind: 'help' };
+  if (argv.includes('-v') || argv.includes('--version')) return { kind: 'version' };
+
+  const command = argv[0];
+  if (command === undefined) {
+    return { kind: 'error', message: 'No command given.' };
+  }
+  if (!(KNOWN_COMMANDS as readonly string[]).includes(command)) {
+    const looksLikeFlag = command.startsWith('-');
+    return {
+      kind: 'error',
+      message: looksLikeFlag
+        ? `Unknown option: ${command} (options come after a command, e.g. \`scan ${command}\`)`
+        : `Unknown command: ${command}`,
+    };
+  }
+
+  let rootDir = process.cwd();
+  let allowRemote = false;
+  let timeoutMs: number | undefined;
+
+  for (let i = 1; i < argv.length; i++) {
+    const arg = argv[i];
+
+    if (arg === '--') {
+      // 옵션 끝. 뒤에 남은 것은 전부 위치 인자인데 이 CLI 는 위치 인자를 받지 않는다.
+      const rest = argv.slice(i + 1);
+      if (rest.length > 0) {
+        return { kind: 'error', message: `Unexpected argument after \`--\`: ${rest[0]} (this CLI takes no positional arguments — use --path <dir>)` };
+      }
+      break;
+    }
+
+    if (arg === '--path') {
+      const value = argv[i + 1];
+      // 값이 없는데 조용히 cwd 로 넘어가면, 사용자는 자기가 지정한 곳을 봤다고 믿는다.
+      if (value === undefined || value === '--' || value.startsWith('-')) {
+        return { kind: 'error', message: `--path expects a directory (got: ${value ?? '<missing>'})` };
+      }
+      rootDir = value;
+      i++;
+      continue;
+    }
+
+    if (arg === '--allow-remote') {
+      allowRemote = true;
+      continue;
+    }
+
+    // ⚠️ 2026-08-27 배선. `--scan-timeout` 은 Spec §2.1 FR-01 시그니처에도 있고 runner.ts 주석도
+    //    "이 플래그로 조정한다"고 안내해 왔지만, **cli.ts 가 argv 에서 읽은 적이 한 번도 없었다** —
+    //    선언만 있고 소비처가 0 인, 이 프로젝트가 반복해서 잡아온 그 패턴이다.
+    //    도움말을 쓰다가 발견했다(없는 플래그를 안내할 뻔했다).
+    if (arg === '--scan-timeout') {
+      const raw = argv[i + 1];
+      const parsed = Number(raw);
+      // 잘못된 값을 조용히 기본값으로 삼키지 않는다 — 사용자는 자기가 준 값이 무시된 줄 모른다.
+      if (raw === undefined || raw.trim() === '' || !Number.isFinite(parsed) || parsed <= 0) {
+        return { kind: 'error', message: `--scan-timeout expects a positive number of milliseconds (got: ${raw ?? '<missing>'})` };
+      }
+      timeoutMs = parsed;
+      i++;
+      continue;
+    }
+
+    return {
+      kind: 'error',
+      message: arg.startsWith('-')
+        ? `Unknown option: ${arg}`
+        : `Unexpected argument: ${arg} (this CLI takes no positional arguments — use --path <dir>)`,
+    };
+  }
+
+  return { kind: 'scan', rootDir, allowRemote, timeoutMs };
+}
+
+export async function main(argv: string[]): Promise<void> {
+  const parsed = parseArgs(argv);
+  if (parsed.kind === 'help') {
     process.stdout.write(USAGE);
     return;
   }
-  if (argv.includes('-v') || argv.includes('--version')) {
+  if (parsed.kind === 'version') {
     process.stdout.write(`${readPackageVersion()}\n`);
     return;
   }
-
-  const pathIdx = argv.indexOf('--path');
-  const rootDir = pathIdx >= 0 ? argv[pathIdx + 1] : process.cwd();
-  const allowRemote = argv.includes('--allow-remote');
-
-  // ⚠️ 2026-08-27 배선. `--scan-timeout` 은 Spec §2.1 FR-01 시그니처에도 있고 runner.ts 주석도
-  //    "이 플래그로 조정한다"고 안내해 왔지만, **cli.ts 가 argv 에서 읽은 적이 한 번도 없었다** —
-  //    선언만 있고 소비처가 0 인, 이 프로젝트가 반복해서 잡아온 그 패턴이다.
-  //    도움말을 쓰다가 발견했다(없는 플래그를 안내할 뻔했다).
-  const timeoutIdx = argv.indexOf('--scan-timeout');
-  let timeoutMs: number | undefined;
-  if (timeoutIdx >= 0) {
-    const raw = argv[timeoutIdx + 1];
-    const parsed = Number(raw);
-    // 잘못된 값을 조용히 기본값으로 삼키지 않는다 — 사용자는 자기가 준 값이 무시된 줄 모른다.
-    if (!Number.isFinite(parsed) || parsed <= 0) {
-      process.stderr.write(`--scan-timeout expects a positive number of milliseconds (got: ${raw ?? '<missing>'})\n`);
-      process.exit(2);
-    }
-    timeoutMs = parsed;
+  if (parsed.kind === 'error') {
+    // usage 를 함께 낸다 — 무엇이 틀렸는지만 알려주고 올바른 형태를 안 보여주면 한 번 더 틀린다.
+    process.stderr.write(`${parsed.message}\n\n${USAGE}`);
+    process.exit(2);
+    return;
   }
+  const { rootDir, allowRemote, timeoutMs } = parsed;
 
   const py = checkPythonAvailable();
   if (!py.ok) {
