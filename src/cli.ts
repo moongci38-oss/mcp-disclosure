@@ -234,6 +234,30 @@ export async function main(argv: string[]): Promise<void> {
   }
 
   const runnerResult = await runScanner(targets, { allowRemote, timeoutMs });
+
+  // ⚠️ D1(a) 회귀 (2026-08-29 첫인상 QA). md 리포트는 실패를 이미 맨 위 인용블록·3a·Unscanned
+  //    items 세 곳에서 알리고 있었다. 그런데 **터미널은 침묵했다** — stdout 은 "Report written"
+  //    한 줄, stderr 0줄, exit 0. 리포트를 열지 않은 사람에게는 신호가 0이라, 스캐너를 설치하지
+  //    않은 채 빈 스캔을 돌리고도 성공했다고 믿게 된다.
+  //    exit code 는 일부러 건드리지 않는다 — 0 → 비0 은 사용자 스크립트를 깨는 계약 변경이라
+  //    별도 판단 대상이다(cli.scan-failure-signal.test.ts 가 그 계약을 잠그고 있다).
+  if (runnerResult.unscanned.length > 0) {
+    // 사유별로 묶어 한 줄로 낸다 — 대상이 많아도 터미널을 도배하지 않으면서 "왜"를 잃지 않는다.
+    const firstDetailByReason = new Map<string, string | undefined>();
+    for (const u of runnerResult.unscanned) {
+      if (!firstDetailByReason.has(u.reason)) {
+        firstDetailByReason.set(u.reason, u.detail?.trim().replace(/\s+/g, ' '));
+      }
+    }
+    const why = [...firstDetailByReason.entries()]
+      .map(([reason, detail]) => (detail ? `${reason}: ${detail}` : reason))
+      .join(' | ');
+    process.stderr.write(
+      `Warning: ${runnerResult.unscanned.length} of ${targets.length} target(s) could not be scanned ` +
+      `(${why}). Axes are reported only for targets that were actually scanned — ` +
+      `see "Unscanned items" in the report.\n`,
+    );
+  }
   // A-1 codex 반영: 종전엔 `r.findings ?? []` 로 직접 읽어 findings 가 항상 0건이었다(raw 는
   // findings 배열이 아니라 봉투다). parseScannerRawEnvelope 하나로 이 계약을 강제한다.
   const rawFindings = [...runnerResult.rawByTarget.entries()]

@@ -132,7 +132,17 @@ export function render(
 
   if (unscanned.length > 0) {
     lines.push('\n## Unscanned items');
-    for (const u of unscanned) lines.push(`- ${u.target.name} (${u.target.sourcePath}) — reason: ${u.reason}`);
+    for (const u of unscanned) {
+      lines.push(`- ${u.target.name} (${u.target.sourcePath}) — reason: ${u.reason}`);
+      // ⚠️ D1(b) 회귀 (2026-08-29 첫인상 QA). 종전에는 `reason: scanner_error` 라는 **토큰만**
+      //    md 에 실렸고, 실행 가능한 안내("install: pip install cisco-ai-mcp-scanner")는
+      //    JSON 의 unscanned[].detail 에만 있었다. 사람이 읽는 문서가 "뭔가 잘못됐다"까지만
+      //    말하고 "그래서 뭘 하면 되나"를 안 말하면, 못 본 것을 못 봤다고 말하는 이 제품의
+      //    약속이 절반만 지켜진다. detail 을 그대로 싣는다.
+      // 공백 정규화는 3a 사유와 같은 규칙 — 여러 줄 detail 이 목록을 깨뜨리지 않게 한다.
+      const detail = u.detail?.trim().replace(/\s+/g, ' ');
+      if (detail) lines.push(`  - what happened: ${detail}`);
+    }
   }
 
   lines.push(`\nUnmapped findings: ${unmappedCount}`);
