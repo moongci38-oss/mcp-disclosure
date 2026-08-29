@@ -1,6 +1,6 @@
 {
   "name": "mcp-disclosure",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Local-only configuration disclosure CLI for AI agent/MCP setups — reports what it found, what it did not find, and what it cannot see",
   "type": "module",
   "bin": {
