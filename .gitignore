@@ -1,8 +1,11 @@
-
-.claude/state/
 node_modules/
 dist/
-.claude/handover/
-.claude/session-plans/
-.claude/agent-budget/
-.claude/logs/
+
+# 내부 개발 하네스 전체. 이 저장소를 public / private(-internal) 로 가른 이유가 바로 이것이라,
+# 폴더 단위로 하나씩 나열하지 않고 통째로 막는다.
+# ⚠️ 종전에는 state/ handover/ session-plans/ agent-budget/ logs/ 다섯 개만 적혀 있었고,
+#    그래서 새로 생긴 .claude/worktrees/ 가 untracked 로 떠 있었다(2026-08-29 실측).
+#    열거 방식은 새 하위 폴더가 생길 때마다 조용히 구멍이 난다.
+.claude/
+
+.claude/state/
