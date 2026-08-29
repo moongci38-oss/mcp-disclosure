@@ -64,8 +64,13 @@ Writes two files into the scanned directory:
 - `mcp-disclosure-findings.md` — the report you read
 - `mcp-disclosure-findings.json` — the same data, complete (the markdown truncates long ID lists)
 
-Exit codes: `0` report written · `1` no configuration found / Python missing · `2` ontology or
-render failed closed · `3` unexpected error.
+Exit codes: `0` report written · `1` no configuration found / Python missing · `2` invalid arguments,
+or ontology / render failed closed · `3` unexpected error.
+
+Unknown flags and stray arguments are rejected with exit `2` rather than ignored — a typo like
+`--paht ./repo` must not quietly scan somewhere else. And exit `0` does not mean every target was
+scanned: if some could not be, a warning goes to stderr and the report lists them under
+**Unscanned items**.
 
 ## What runs, and what talks to the network
 
@@ -101,7 +106,8 @@ pip install cisco-ai-mcp-scanner
 
 mcp-disclosure does not install it for you and does not try to. If the scanner is missing, the run
 still produces a report — one that says every technical axis was **not evaluated**, with the
-reason. It will not tell you things look fine.
+reason. It will not tell you things look fine. You also get a warning on stderr saying how many
+targets could not be scanned and why, so you find out without opening the report.
 
 If your system Python is older than 3.11.4, an isolated environment works. With
 [uv](https://docs.astral.sh/uv/getting-started/installation/) (`curl -LsSf https://astral.sh/uv/install.sh | sh`,
