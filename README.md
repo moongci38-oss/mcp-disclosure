@@ -28,36 +28,49 @@ No findings ≠ proof of safety — undetected as of 2026-08-22T08:51:19Z, per c
 
 ## Install
 
-**Not on npm yet.** Clone and build — it takes about a minute and needs nothing but Node.
+No install step. `npx` fetches it for you:
+
+```bash
+npx mcp-disclosure scan
+```
+
+If you reach for it often, install it once and drop the `npx`:
+
+```bash
+npm install -g mcp-disclosure
+mcp-disclosure scan
+```
+
+> Either way you still need the Python scanner — see [Requirements](#requirements). Without it the
+> run produces a report that says every technical axis was **not evaluated**, and warns you on
+> stderr. It will not tell you things look fine.
+
+### Working on mcp-disclosure itself
+
+The above is for *using* it. To *change* it, clone and build:
 
 ```bash
 git clone https://github.com/moongci38-oss/mcp-disclosure.git
 cd mcp-disclosure
 npm install
 npm run build
+npm test
 ```
 
-Then run it with `node bin/mcp-disclosure.js`. To get the shorter `mcp-disclosure` command, link it
-once:
-
-```bash
-npm link            # now `mcp-disclosure` works anywhere
-```
-
-> An npm release is planned, at which point `npx mcp-disclosure scan` will work with no install
-> step. Until that lands, this README documents only what actually works today.
+Then run your build with `node bin/mcp-disclosure.js`, or `npm link` to put your working copy
+behind the `mcp-disclosure` command.
 
 ## Usage
 
 ```bash
-node bin/mcp-disclosure.js --help               # what it does and every flag it takes
-node bin/mcp-disclosure.js scan                 # scan the current directory
-node bin/mcp-disclosure.js scan --path ./repo   # scan a specific directory
-node bin/mcp-disclosure.js scan --allow-remote  # opt in to scanning remote MCP endpoints (off by default)
-node bin/mcp-disclosure.js scan --scan-timeout 300000   # raise the per-scan timeout (default 120000 ms)
+npx mcp-disclosure --help                        # what it does and every flag it takes
+npx mcp-disclosure scan                          # scan the current directory
+npx mcp-disclosure scan --path ./repo            # scan a specific directory
+npx mcp-disclosure scan --allow-remote           # opt in to scanning remote MCP endpoints (off by default)
+npx mcp-disclosure scan --scan-timeout 300000    # raise the per-scan timeout (default 120000 ms)
 ```
 
-After `npm link`, drop the `node bin/...` prefix: `mcp-disclosure scan --path ./repo`.
+Installed globally or linked, drop the `npx`: `mcp-disclosure scan --path ./repo`.
 
 Writes two files into the scanned directory:
 
