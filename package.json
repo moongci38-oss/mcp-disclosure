@@ -4,7 +4,7 @@
   "description": "Local-only configuration disclosure CLI for AI agent/MCP setups — reports what it found, what it did not find, and what it cannot see",
   "type": "module",
   "bin": {
-    "mcp-disclosure": "./bin/mcp-disclosure.js"
+    "mcp-disclosure": "bin/mcp-disclosure.js"
   },
   "engines": {
     "node": ">=20"
