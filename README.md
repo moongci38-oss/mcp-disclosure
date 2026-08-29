@@ -59,7 +59,7 @@ node bin/mcp-disclosure.js scan --scan-timeout 300000   # raise the per-scan tim
 
 After `npm link`, drop the `node bin/...` prefix: `mcp-disclosure scan --path ./repo`.
 
-Writes two files next to the scanned directory:
+Writes two files into the scanned directory:
 
 - `mcp-disclosure-findings.md` — the report you read
 - `mcp-disclosure-findings.json` — the same data, complete (the markdown truncates long ID lists)
