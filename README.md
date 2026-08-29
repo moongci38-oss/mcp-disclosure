@@ -103,10 +103,20 @@ mcp-disclosure does not install it for you and does not try to. If the scanner i
 still produces a report — one that says every technical axis was **not evaluated**, with the
 reason. It will not tell you things look fine.
 
-If your system Python is older than 3.11.4, an isolated environment works:
+If your system Python is older than 3.11.4, an isolated environment works. With
+[uv](https://docs.astral.sh/uv/getting-started/installation/) (`curl -LsSf https://astral.sh/uv/install.sh | sh`,
+or `brew install uv`):
 
 ```bash
 uv venv --python 3.12 && uv pip install cisco-ai-mcp-scanner
+export PATH="$PWD/.venv/bin:$PATH"
+```
+
+`uv` is convenient because it can fetch a newer Python for you. If you already have Python 3.11.4+
+under another name, the standard library does the same job:
+
+```bash
+python3.12 -m venv .venv && .venv/bin/pip install cisco-ai-mcp-scanner
 export PATH="$PWD/.venv/bin:$PATH"
 ```
 
