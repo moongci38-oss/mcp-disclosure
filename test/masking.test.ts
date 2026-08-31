@@ -53,3 +53,77 @@ test('redacted 플래그가 항상 true 다(마스킹 여부와 무관 — 소�
   assert.equal(redact({}).redacted, true);
   assert.equal(redact({ rule: 'x' }).redacted, true);
 });
+
+// --- 설정 인벤토리 경로 (2026-08-31) ---------------------------------------
+// 인벤토리 절은 설정 원문을 소견서로 옮기는 유일한 경로다 — 여기서 새는 것이 가장 아프다.
+// ⚠️ 아래 값은 전부 테스트 전용 가짜다(실제 키 아님, §0 전제사항).
+import { redactArgs, redactCommand } from '../src/masking.js';
+
+test('args — `--api-key=<값>` 형태는 값만 마스킹하고 플래그 이름은 남긴다', () => {
+  const secret = 'sk-' + 'ARGVALUE1234567890ABCDEF';
+  const out = redactArgs(['--api-key=' + secret, '--verbose']);
+  assert.equal(out[0], '--api-key=***REDACTED***', '플래그 이름은 남아야 무엇이 가려졌는지 안다');
+  assert.equal(out[1], '--verbose', '평범한 플래그까지 가리면 목록이 쓸모없어진다');
+  assert.ok(!out.join(' ').includes(secret));
+});
+
+test('args — `--token <값>` 처럼 다음 인자로 오는 값도 플래그 이름을 키로 삼아 마스킹', () => {
+  // ⚠️ 이 값은 짧고 엔트로피가 낮아 **값 기반 규칙만으로는 안 걸린다** — 앞 플래그(token)가
+  //    KEY_DENYLIST 에 있어서 잡히는 경로다. 그 경로가 살아 있는지 못 박는다.
+  const out = redactArgs(['--token', 'hunter2']);
+  assert.equal(out[0], '--token');
+  assert.equal(out[1], '***REDACTED***', '플래그 문맥이 죽으면 짧은 시크릿이 그대로 실린다');
+});
+
+test('args — 하이픈 플래그도 KEY_DENYLIST 형태로 정규화된다(--api-key → api_key)', () => {
+  assert.equal(redactArgs(['--api-key', 'short1'])[1], '***REDACTED***');
+  assert.equal(redactArgs(['--Password', 'short2'])[1], '***REDACTED***', '대소문자도 정규화해야 한다');
+});
+
+test('args — 평범한 경로·패키지명은 그대로 남는다(과다마스킹으로 목록이 죽지 않게)', () => {
+  const out = redactArgs(['-y', '@modelcontextprotocol/server-filesystem', '/tmp']);
+  assert.deepEqual(out, ['-y', '@modelcontextprotocol/server-filesystem', '/tmp']);
+});
+
+test('args — 플래그 없이 떠 있는 토큰도 값 기반 규칙으로 잡힌다', () => {
+  const secret = 'ghp_' + 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+  assert.equal(redactArgs([secret])[0], '***REDACTED***');
+});
+
+test('args — URL 자격증명이 인자로 들어와도 마스킹된다', () => {
+  const url = 'https://' + 'svc:hunter2hunter2@internal.example.com/mcp';
+  assert.equal(redactArgs([url])[0], '***REDACTED***');
+});
+
+test('redactCommand — 평범한 커맨드는 보존, 자격증명 박힌 것은 마스킹', () => {
+  assert.equal(redactCommand('npx'), 'npx');
+  assert.equal(redactCommand('/usr/bin/python3'), '/usr/bin/python3');
+  assert.equal(redactCommand('https://' + 'u:p4ssw0rdp4ssw0rd@host/x'), '***REDACTED***');
+});
+
+// ⚠️ 과다마스킹 회귀 (2026-08-31 실측으로 발견) — 기본 엔트로피 문턱 4.0 은 스캐너 raw 값
+//    기준이라 설정 인자에는 너무 낮았다. `@modelcontextprotocol/server-github`(4.09)가 통째로
+//    가려져서 "무엇이 연결돼 있는가" 절이 무의미해졌다. 양방향으로 못 박는다.
+test('args 과다마스킹 — 흔한 MCP 패키지 지정자는 가려지지 않는다', () => {
+  for (const pkg of [
+    '@modelcontextprotocol/server-github',
+    '@modelcontextprotocol/server-filesystem',
+    '@modelcontextprotocol/server-slack',
+    '@modelcontextprotocol/server-memory',
+  ]) {
+    assert.equal(redactArgs(['-y', pkg])[1], pkg, `${pkg} 가 가려지면 인벤토리가 쓸모없어진다`);
+  }
+});
+
+test('args 과다마스킹 완화가 실제 토큰까지 통과시키지는 않는다(양방향 확인)', () => {
+  const real = 'ghp_' + 'FAKE0123456789ABCDEFGHIJKLMNOPQRSTUV'; // 테스트 전용 가짜 값
+  assert.equal(redactArgs([real])[0], '***REDACTED***', '알려진 프리픽스는 문맥 없이도 잡혀야 한다');
+  // 프리픽스 없는 고엔트로피 무작위 문자열도 완화된 문턱(4.5) 위면 잡힌다.
+  const highEntropy = 'Xq7Zk2Rm9Tb4Wv6Yc1Nd8Fg3Hj5Ls0Pu';
+  assert.equal(redactArgs([highEntropy])[0], '***REDACTED***');
+});
+
+test('args 과다마스킹 — 플래그 문맥이 있으면 완화가 적용되지 않는다(더 엄격한 쪽 유지)', () => {
+  // 패키지명처럼 생겼어도 --token 뒤에 오면 가린다. 완화는 "문맥 없는 위치 인자"에만이다.
+  assert.equal(redactArgs(['--token', '@modelcontextprotocol/server-github'])[1], '***REDACTED***');
+});

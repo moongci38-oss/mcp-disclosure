@@ -94,6 +94,15 @@ export type ScanTarget = {
   name: string;
   transport: Transport;
   remoteUrl?: string;      // transport==='remote'일 때만 — argv에는 조건부로만 전달(§8.3 ADR-006)
+
+  // ── 설정 인벤토리 (2026-08-31) ──────────────────────────────────────────────
+  // "이 설정에 무엇이 연결돼 있는가"를 소견서에 싣기 위한 값. discover() 가 이미 파싱하고
+  // 있었는데 그냥 버리던 것들이다.
+  // ⚠️ 여기 담기는 값은 **discover() 에서 이미 마스킹을 거친 뒤**여야 한다 — 원문이 이 타입에
+  //    들어오는 순간 이후 모든 소비처가 유출 경로가 된다. 마스킹은 출구가 아니라 입구에서 한다.
+  command?: string;        // 실행 커맨드 (마스킹 통과본)
+  args?: string[];         // 실행 인자 (마스킹 통과본)
+  envKeys?: string[];      // ⚠️ 환경변수 **키 이름만**. 값은 어떤 경우에도 담지 않는다.
 };
 
 export type UnscannedReason = 'remote_out_of_scope' | 'timeout' | 'output_too_large' | 'scanner_error';

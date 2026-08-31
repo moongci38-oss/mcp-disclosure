@@ -1,6 +1,7 @@
 // src/render.ts — 소견서 렌더 (FR-04)
 import { ALL_AXES } from './ontology.js';
-import type { Claim, Finding, ScannerMeta, Unscanned } from './types.js';
+import { redactCommand } from './masking.js';
+import type { Claim, Finding, ScanTarget, ScannerMeta, Unscanned } from './types.js';
 
 export class RenderError extends Error {}
 
@@ -43,6 +44,9 @@ export function render(
   claims: Claim[], findings: Finding[], meta: ScannerMeta,
   unscanned: Unscanned[], unmatchedSignals: string[], opts: RenderOpts, ontology: any,
   scannerWarnings: string[] = [], // A-3 codex 반영 — 기본값으로 기존 7-인자 호출부 하위호환
+  // 설정 인벤토리(2026-08-31). 기본값 [] 로 기존 호출부를 그대로 둔다.
+  // ⚠️ 여기 오는 ScanTarget 은 discover() 에서 **이미 마스킹된** 것이다(입구 마스킹).
+  targets: ScanTarget[] = [],
 ): { markdown: string; json: string } {
   assertCoverageComplete(claims);
   assertMetaComplete(meta);
@@ -90,6 +94,49 @@ export function render(
   // A-3 codex 반영 — 스캐너 버전이 지원 범위 밖일 때의 경고(cli.ts 가 채워 넘긴다)
   for (const w of scannerWarnings) lines.push(`> ⚠️ ${w}`);
   lines.push(`> ${disclaimers.genre}`);
+
+  // ⚠️ 2026-08-31 신설. discover() 가 command/args/env 를 파싱해놓고 버리는 바람에, 소견서가
+  //    "이 설정에 무엇이 연결돼 있는지"를 한 줄도 말하지 못했다.
+  //    이 절은 **판정이 아니라 목록**이다 — "최소권한이다" 같은 평가를 여기 쓰지 않는다.
+  //    그런 주장은 이 도구가 할 수 없는 주장이고, 못 하는 말을 하는 순간 제품의 축이 무너진다.
+  //    ⚠️ 정식 coverage 축(ALL_AXES)이 **아니다**. 축으로 만들면 15축 전수성 계약과
+  //    claim 버킷팅을 동시에 흔든다 — 이 절은 claims 와 무관한 독립 목록이다.
+  // ⚠️ `remoteUrl` 만은 discover() 에서 마스킹하지 **못한다** — runner 가 이 값을 그대로
+  //    스캐너 argv 에 넘겨야 원격 스캔이 성립하기 때문이다(마스킹하면 스캔 자체가 깨진다).
+  //    그래서 이 필드는 예외적으로 **출력 시점에** 같은 판정을 태운다. 아래 inventory 는
+  //    markdown 과 JSON 이 함께 쓰는 **표시 전용 투영**이고, 원본 ScanTarget 은 JSON 에 싣지 않는다
+  //    (2026-08-31 회귀 테스트가 URL 자격증명 유출을 실제로 잡아서 이 구조가 됐다).
+  const inventory = targets.map(t => ({
+    name: t.name,
+    kind: t.kind,
+    transport: t.transport,
+    sourcePath: t.sourcePath,
+    endpoint: t.remoteUrl ? redactCommand(t.remoteUrl) : undefined,
+    command: t.command,
+    args: t.args,
+    envKeys: t.envKeys,
+  }));
+
+  if (inventory.length > 0) {
+    lines.push('\n## What is wired into this configuration');
+    lines.push(
+      'A list, not an assessment. These entries were read from your configuration files. ' +
+      'Appearing here does not mean an entry was scanned — see the sections below for that.',
+    );
+    for (const t of inventory) {
+      const where = t.transport === 'remote' ? 'remote' : 'local stdio';
+      lines.push(`\n- **${t.name}** (${t.kind}, ${where}) — declared in \`${t.sourcePath}\``);
+      if (t.endpoint) lines.push(`  - endpoint: \`${t.endpoint}\``);
+      if (t.command) {
+        const argv = [t.command, ...(t.args ?? [])].join(' ');
+        lines.push(`  - runs: \`${argv}\``);
+      }
+      if (t.envKeys && t.envKeys.length > 0) {
+        // ⚠️ 이름만이다. 값은 discover() 가 애초에 읽어 담지 않는다(입구 차단).
+        lines.push(`  - env keys: ${t.envKeys.map(k => `\`${k}\``).join(', ')} — names only, values are never read into this report`);
+      }
+    }
+  }
 
   lines.push('\n## 1. What we scanned and found');
   // ⚠️ 도그푸딩 Task 26 발견: 실제 스캔에서 한 축에 154건이 나왔고, ID 를 전부 나열하니 소견서에서
@@ -155,6 +202,19 @@ export function render(
   }
 
   const markdown = lines.join('\n');
-  const json = JSON.stringify({ meta, findings, claims, unscanned, unmatchedSignals, scannerWarnings }, null, 2);
+  // ⚠️ 2026-08-31 실측으로 잡은 **기존 누출**: `unscanned[].target` 은 ScanTarget 원본이라
+  //    자격증명이 박힌 `remoteUrl`(`https://user:pass@host/...`)이 JSON 으로 그대로 나갔다.
+  //    markdown 은 이름·경로만 찍어서 안 보였고, 기존 회귀 테스트는 전부 `unscanned: []` 로
+  //    렌더해서 이 경로를 한 번도 지나지 않았다 — 그래서 여태 안 걸렸다.
+  //    JSON 도 같은 판정을 태운다(값이 필요한 곳은 runner 이고, 거기엔 원본이 그대로 남는다).
+  const safeUnscanned = unscanned.map(u => ({
+    ...u,
+    target: u.target.remoteUrl
+      ? { ...u.target, remoteUrl: redactCommand(u.target.remoteUrl) }
+      : u.target,
+  }));
+
+  // `inventory` = 위 목록의 기계 판독본. markdown 과 같은 값(=이미 마스킹된 투영)이다.
+  const json = JSON.stringify({ meta, findings, claims, unscanned: safeUnscanned, unmatchedSignals, scannerWarnings, inventory }, null, 2);
   return { markdown, json };
 }

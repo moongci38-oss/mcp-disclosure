@@ -319,6 +319,8 @@ export async function main(argv: string[]): Promise<void> {
       claims, findings, meta, runnerResult.unscanned, unmatchedSignals,
       { allowRemote, usedRemoteCount: runnerResult.usedRemoteTargets.length },
       ontologyRaw, scannerWarnings,
+      // 설정 인벤토리 — discover() 가 이미 마스킹해 담아 둔 값을 그대로 넘긴다.
+      targets,
     );
     writeFileSync(join(rootDir, 'mcp-disclosure-findings.md'), markdown);
     writeFileSync(join(rootDir, 'mcp-disclosure-findings.json'), json);
